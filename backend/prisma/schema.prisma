@@ -1,0 +1,357 @@
+// CareAxis Prisma Schema
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AgencyClassification {
+  Limited
+  Basic
+  Intermediate
+  Comprehensive
+}
+
+enum LocationType {
+  Parent
+  Subunit
+  Branch
+}
+
+enum UserRole {
+  Owner
+  Administrator
+  Coordinator
+  Nurse
+  Biller
+  ReadOnly
+}
+
+enum ClientStatus {
+  Active
+  Inactive
+  OnHold
+  Discharged
+}
+
+enum CaregiverStatus {
+  Active
+  Inactive
+  OnLeave
+}
+
+enum ShiftStatus {
+  Scheduled
+  InProgress
+  Completed
+  Missed
+  Cancelled
+}
+
+enum InvoiceStatus {
+  Draft
+  Submitted
+  Paid
+  Overdue
+  Voided
+}
+
+enum PayerType {
+  Medicaid
+  PrivatePay
+  Veterans
+  LongTermCareInsurance
+}
+
+// ============ AGENCY ============
+model Agency {
+  id                 String               @id @default(cuid())
+  name               String
+  classification     AgencyClassification
+  licenseNumber      String?
+  licenseExpiry      DateTime?
+  address            String
+  phone              String
+  email              String?
+  website            String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  locations          Location[]
+  users              User[]
+  clients            Client[]
+  caregivers         Caregiver[]
+  policyManuals      PolicyManual[]
+  qaRecords          QARecord[]
+  incidentReports    IncidentReport[]
+}
+
+// ============ LOCATION ============
+model Location {
+  id                 String               @id @default(cuid())
+  agencyId           String
+  name               String
+  type               LocationType
+  address            String
+  phone              String
+  classification     AgencyClassification
+  licenseNumber      String?
+  licenseExpiry      DateTime?
+  administratorId    String?
+  status             String               @default("Active")
+  createdAt          DateTime             @default(now())
+  agency             Agency               @relation(fields: [agencyId], references: [id])
+  clients            Client[]
+  caregivers         Caregiver[]
+}
+
+// ============ USER ============
+model User {
+  id                 String    @id @default(cuid())
+  agencyId           String
+  email              String    @unique
+  passwordHash       String
+  name               String
+  role               UserRole
+  locationId         String?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  agency             Agency    @relation(fields: [agencyId], references: [id])
+  auditLogs          AuditLog[]
+}
+
+// ============ CLIENT ============
+model Client {
+  id                       String         @id @default(cuid())
+  agencyId                 String
+  locationId               String?
+  name                     String
+  dob                      DateTime
+  address                  String
+  phone                    String
+  pcp                      String
+  pcpPhone                 String?
+  hospital                 String?
+  payer                    PayerType
+  diagnoses                String[]
+  allergies                String[]
+  medications              String[]
+  fallRisk                 String         @default("Low")
+  emergencyContact         String
+  emergencyPhone           String
+  status                   ClientStatus   @default(Active)
+  classification           AgencyClassification
+  canSelfDirect            Boolean        @default(true)
+  stableAndPredictable     Boolean        @default(true)
+  startDate                DateTime?
+  endDate                  DateTime?
+  notes                    String?
+
+  // Oregon compliance dates
+  disclosureSignedDate     DateTime?
+  rightsSignedDate         DateTime?
+  initialAssessmentDate    DateTime?
+  servicePlanDate          DateTime?
+  serviceAgreementDate     DateTime?
+  initialVisitDate         DateTime?
+  lastMonitoringDate       DateTime?
+  lastSelfDirectionEvalDate DateTime?
+
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  agency                   Agency         @relation(fields: [agencyId], references: [id])
+  location                 Location?      @relation(fields: [locationId], references: [id])
+  shifts                   Shift[]
+  formRecords              FormRecord[]
+  clientCaregivers         ClientCaregiver[]
+  monitoringVisits         MonitoringVisit[]
+}
+
+// ============ CAREGIVER ============
+model Caregiver {
+  id                       String           @id @default(cuid())
+  agencyId                 String
+  locationId               String?
+  name                     String
+  phone                    String
+  email                    String           @unique
+  address                  String
+  status                   CaregiverStatus  @default(Active)
+  classification           AgencyClassification
+  certifications           String[]
+  licenseNumber            String?
+  licenseExpiry            DateTime?
+  hireDate                 DateTime?
+  driverLicense            Boolean          @default(false)
+  autoInsurance            Boolean          @default(false)
+  rating                   Float            @default(5.0)
+
+  // Oregon compliance dates
+  backgroundCheckDate      DateTime?
+  backgroundCheckRenewalDue DateTime?
+  orientationDate          DateTime?
+  initialTrainingDate      DateTime?
+  lastAnnualTrainingDate   DateTime?
+  medicationTrainedDate    DateTime?
+  leieCheckedDate          DateTime?
+
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  agency                   Agency           @relation(fields: [agencyId], references: [id])
+  location                 Location?        @relation(fields: [locationId], references: [id])
+  shifts                   Shift[]
+  clientCaregivers         ClientCaregiver[]
+}
+
+// ============ CLIENT-CAREGIVER ASSIGNMENT ============
+model ClientCaregiver {
+  id           String    @id @default(cuid())
+  clientId     String
+  caregiverId  String
+  assignedAt   DateTime  @default(now())
+  isPrimary    Boolean   @default(false)
+  client       Client    @relation(fields: [clientId], references: [id])
+  caregiver    Caregiver @relation(fields: [caregiverId], references: [id])
+  @@unique([clientId, caregiverId])
+}
+
+// ============ SHIFT / EVV ============
+model Shift {
+  id           String      @id @default(cuid())
+  clientId     String
+  caregiverId  String
+  date         DateTime
+  startTime    String
+  endTime      String
+  status       ShiftStatus @default(Scheduled)
+  evvClockIn   DateTime?
+  evvClockOut  DateTime?
+  evvMethod    String?
+  evvVerified  Boolean     @default(false)
+  evvLatIn     Float?
+  evvLngIn     Float?
+  evvLatOut    Float?
+  evvLngOut    Float?
+  tasks        String[]
+  visitNotes   String?
+  location     String
+  createdAt    DateTime    @default(now())
+  client       Client      @relation(fields: [clientId], references: [id])
+  caregiver    Caregiver   @relation(fields: [caregiverId], references: [id])
+}
+
+// ============ INVOICE ============
+model Invoice {
+  id           String        @id @default(cuid())
+  agencyId     String
+  clientId     String
+  payer        PayerType
+  periodStart  DateTime
+  periodEnd    DateTime
+  hours        Float
+  rate         Float
+  amount       Float
+  status       InvoiceStatus @default(Draft)
+  dueDate      DateTime?
+  paidDate     DateTime?
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+// ============ FORM RECORDS ============
+model FormRecord {
+  id           String    @id @default(cuid())
+  clientId     String
+  formId       String    // CF01, CF02, etc.
+  formData     Json
+  completedBy  String
+  completedAt  DateTime  @default(now())
+  signatureData String?
+  client       Client    @relation(fields: [clientId], references: [id])
+}
+
+// ============ MONITORING VISIT ============
+model MonitoringVisit {
+  id               String    @id @default(cuid())
+  clientId         String
+  visitDate        DateTime
+  visitType        String    // Initial, Quarterly, Other
+  visitMethod      String    // InPerson, Phone, Video
+  conductedBy      String
+  checklistData    Json
+  narrativeNotes   String?
+  caregiverPresent Boolean   @default(false)
+  caregiverName    String?
+  clientSignature  Boolean   @default(false)
+  adminSignature   Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  client           Client    @relation(fields: [clientId], references: [id])
+}
+
+// ============ QA RECORD ============
+model QARecord {
+  id                String    @id @default(cuid())
+  agencyId          String
+  meetingDate       DateTime
+  attendees         Json      // [{name, title}]
+  adverseEvents     String?
+  qualityIndicators String?
+  preventiveStrategies String?
+  nextMeetingDate   DateTime?
+  createdAt         DateTime  @default(now())
+  agency            Agency    @relation(fields: [agencyId], references: [id])
+}
+
+// ============ INCIDENT REPORT ============
+model IncidentReport {
+  id              String    @id @default(cuid())
+  agencyId        String
+  clientId        String
+  caregiverId     String?
+  incidentDate    DateTime
+  type            String
+  severity        String
+  description     String
+  immediateAction String?
+  reportedToODHS  Boolean   @default(false)
+  reportedToOHA   Boolean   @default(false)
+  reportedToLE    Boolean   @default(false)
+  status          String    @default("Open")
+  resolution      String?
+  createdAt       DateTime  @default(now())
+  agency          Agency    @relation(fields: [agencyId], references: [id])
+}
+
+// ============ POLICY MANUAL ============
+model PolicyManual {
+  id             String    @id @default(cuid())
+  agencyId       String
+  version        String
+  state          String    @default("OR")
+  classification AgencyClassification
+  content        String    // Full manual text
+  sections       Json      // Array of accepted sections
+  createdAt      DateTime  @default(now())
+  createdBy      String
+  agency         Agency    @relation(fields: [agencyId], references: [id])
+}
+
+// ============ AUDIT LOG ============
+model AuditLog {
+  id         String    @id @default(cuid())
+  userId     String
+  action     String
+  resource   String
+  resourceId String?
+  details    Json?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id])
+}
