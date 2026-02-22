@@ -2,3 +2,6 @@ providers = ["node"]
 
 [variables]
 NODE_VERSION = "20"
+
+[start]
+cmd = "cd backend && ([ -n \"$DATABASE_URL\" ] && npx prisma migrate deploy || echo 'DATABASE_URL not set, skipping migration') && npm start"
