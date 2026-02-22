@@ -41,8 +41,8 @@ export default function Reports() {
 
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
-        {[['Reports Run (Feb)', '47', BarChart3, 'bg-blue-600'], ['Scheduled Reports', '3', Calendar, 'bg-teal-600'], ['Data Exports', '12', Download, 'bg-green-600'], ['Custom Reports', '5', TrendingUp, 'bg-purple-600']].map(([label, value, Icon, bg]) => (
-          <div key={label as string} className="card p-4 flex items-start gap-3">
+        {([['Reports Run (Feb)', '47', BarChart3, 'bg-blue-600'], ['Scheduled Reports', '3', Calendar, 'bg-teal-600'], ['Data Exports', '12', Download, 'bg-green-600'], ['Custom Reports', '5', TrendingUp, 'bg-purple-600']] as [string, string, React.ElementType, string][]).map(([label, value, Icon, bg]) => (
+          <div key={label} className="card p-4 flex items-start gap-3">
             <div className={`p-2.5 rounded-lg ${bg}`}><Icon size={18} className="text-white" /></div>
             <div><div className="text-xl font-bold">{value}</div><div className="text-xs text-slate-500">{label}</div></div>
           </div>
