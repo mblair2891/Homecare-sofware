@@ -1,15 +1,18 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd backend && npm install && DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate && npm run build"
+buildCommand = "if [ \"$RAILWAY_SERVICE_NAME\" = 'careaxis-api' ] || [ -z \"$RAILWAY_SERVICE_NAME\" ]; then cd backend && npm install && DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate && npm run build; else cd frontend && npm install && npm run build; fi"
 
 [deploy]
-startCommand = "cd backend && ([ -n \"$DATABASE_URL\" ] && npx prisma migrate deploy || echo 'Skipping migration: DATABASE_URL not set') && npm start"
-healthcheckPath = "/health"
+startCommand = "if [ \"$RAILWAY_SERVICE_NAME\" = 'careaxis-api' ] || [ -z \"$RAILWAY_SERVICE_NAME\" ]; then cd backend && ([ -n \"$DATABASE_URL\" ] && npx prisma migrate deploy || echo 'Skipping migration: DATABASE_URL not set') && npm start; else cd frontend && npm start; fi"
+healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 
 [[services]]
 name = "careaxis-api"
+
+[services.deploy]
+healthcheckPath = "/health"
 
 [services.variables]
 PORT = "4000"
