@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const router = Router();
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const getClient = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // POST /api/policies/generate-section
 // Called when a user submits a concern about a policy section
@@ -15,7 +15,7 @@ router.post('/generate-section', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'sectionTitle, oar, and concern are required' });
     }
 
-    const message = await client.messages.create({
+    const message = await getClient().messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       messages: [
@@ -62,7 +62,7 @@ router.post('/chat', async (req: Request, res: Response) => {
 
     if (!question) return res.status(400).json({ error: 'question is required' });
 
-    const message = await client.messages.create({
+    const message = await getClient().messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 800,
       messages: [
@@ -93,7 +93,7 @@ router.post('/scan', async (req: Request, res: Response) => {
   try {
     const { existingPolicyText, classification, state } = req.body;
 
-    const message = await client.messages.create({
+    const message = await getClient().messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       messages: [
