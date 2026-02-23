@@ -265,9 +265,9 @@ export default function CompaniesPage() {
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5">
                             <span className="font-mono text-xs text-slate-500">{agency.licenseNumber}</span>
-                            {agency.licenseVerified && <CheckCircle size={11} className="text-green-500" title="Verified" />}
+                            {agency.licenseVerified && <CheckCircle size={11} className="text-green-500" aria-label="Verified" />}
                             {agency.licenseStatus && agency.licenseStatus !== 'Active' && (
-                              <Shield size={11} className="text-amber-500" title={agency.licenseStatus} />
+                              <Shield size={11} className="text-amber-500" aria-label={agency.licenseStatus} />
                             )}
                           </div>
                         </td>
