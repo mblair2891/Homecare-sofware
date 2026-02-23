@@ -1,6 +1,9 @@
 import React, { Suspense, lazy } from 'react';
 import Layout from './components/layout/Layout';
 import { useAppStore } from './store/useAppStore';
+import { useAuthStore } from './store/useAuthStore';
+import LoginPage from './pages/LoginPage';
+import SuperAdminLayout from './pages/superadmin/SuperAdminLayout';
 
 const Dashboard = lazy(() => import('./modules/dashboard/Dashboard'));
 const Clients = lazy(() => import('./modules/clients/index'));
@@ -43,7 +46,7 @@ const moduleMap: Record<string, React.ComponentType> = {
   settings: SettingsModule,
 };
 
-export default function App() {
+function AgencyApp() {
   const activeModule = useAppStore((s) => s.activeModule);
   const Component = moduleMap[activeModule] || Dashboard;
 
@@ -54,4 +57,24 @@ export default function App() {
       </Suspense>
     </Layout>
   );
+}
+
+export default function App() {
+  const { user, impersonatingAgency } = useAuthStore();
+
+  // Not logged in → show login page
+  if (!user) return <LoginPage />;
+
+  // SuperAdmin viewing a specific agency → show agency app
+  if (user.role === 'SuperAdmin' && impersonatingAgency) {
+    return <AgencyApp />;
+  }
+
+  // SuperAdmin not viewing an agency → show platform admin panel
+  if (user.role === 'SuperAdmin') {
+    return <SuperAdminLayout />;
+  }
+
+  // Regular agency user → show agency app
+  return <AgencyApp />;
 }

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useAuthStore } from '../../store/useAuthStore';
 import {
   LayoutDashboard, Users, UserCheck, Calendar, DollarSign,
   FileText, MessageSquare, MapPin, UserPlus, BarChart3,
   Settings, Shield, BookOpen, ChevronLeft, ChevronRight,
-  Bell, Search, ChevronDown, Building2
+  Bell, Search, ChevronDown, Building2, ArrowLeft, LogOut
 } from 'lucide-react';
 
 const navItems = [
@@ -29,13 +30,38 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { activeModule, setActiveModule, sidebarCollapsed, setSidebarCollapsed, activeLocation, setActiveLocation, locations } = useAppStore();
+  const { user, impersonatingAgency, exitAgency, logout } = useAuthStore();
   const [showLocationMenu, setShowLocationMenu] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifications] = useState(5);
+
+  const displayName = impersonatingAgency ? impersonatingAgency.name : (user?.agencyName ?? 'CareAxis');
+  const userName = user?.name ?? 'User';
+  const userRole = impersonatingAgency ? 'Platform Admin (Viewing)' : (user?.role ?? 'User');
+  const initials = userName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 
   const locationOptions = ['All Locations', ...locations.map(l => l.name)];
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
+      {/* Impersonation banner */}
+      {impersonatingAgency && (
+        <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between text-sm flex-shrink-0 z-50">
+          <div className="flex items-center gap-2 font-medium">
+            <Shield size={15} />
+            Viewing as Platform Admin — {impersonatingAgency.name}
+          </div>
+          <button
+            onClick={exitAgency}
+            className="flex items-center gap-1.5 px-3 py-1 bg-white/20 hover:bg-white/30 rounded-md text-xs font-medium transition-colors"
+          >
+            <ArrowLeft size={13} />
+            Back to Platform
+          </button>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
       <aside className={`flex flex-col bg-slate-900 transition-all duration-200 ${sidebarCollapsed ? 'w-16' : 'w-60'} flex-shrink-0`}>
         {/* Logo */}
@@ -46,7 +72,7 @@ export default function Layout({ children }: LayoutProps) {
           {!sidebarCollapsed && (
             <div>
               <div className="text-white font-bold text-sm leading-tight">CareAxis</div>
-              <div className="text-slate-400 text-xs">Homecare Management</div>
+              <div className="text-slate-400 text-xs truncate max-w-32">{displayName}</div>
             </div>
           )}
         </div>
@@ -125,14 +151,31 @@ export default function Layout({ children }: LayoutProps) {
             </button>
 
             {/* User */}
-            <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">JA</span>
-              </div>
-              <div className="hidden sm:block">
-                <div className="text-sm font-medium text-slate-700">Jennifer Adams</div>
-                <div className="text-xs text-slate-400">Administrator</div>
-              </div>
+            <div className="relative pl-3 border-l border-slate-200">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 hover:bg-slate-50 rounded-lg px-2 py-1 transition-colors"
+              >
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">{initials}</span>
+                </div>
+                <div className="hidden sm:block text-left">
+                  <div className="text-sm font-medium text-slate-700">{userName}</div>
+                  <div className="text-xs text-slate-400">{userRole}</div>
+                </div>
+                <ChevronDown size={14} className="text-slate-400" />
+              </button>
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+                  <button
+                    onClick={() => { logout(); setShowUserMenu(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                  >
+                    <LogOut size={15} />
+                    Sign out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -141,6 +184,7 @@ export default function Layout({ children }: LayoutProps) {
         <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
+      </div>
       </div>
     </div>
   );
