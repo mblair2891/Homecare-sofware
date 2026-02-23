@@ -8,36 +8,15 @@ type ScheduleTab = 'week' | 'evv' | 'openShifts';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const demoEVV = [
-  { id: 'e1', caregiver: 'Maria Santos', client: 'Margaret Thompson', date: '2026-02-22', clockIn: '08:02', clockOut: '12:15', method: 'GPS', verified: true, visitNotes: 'Client bathed, medications reminded, light housekeeping done.' },
-  { id: 'e2', caregiver: 'James Wilson', client: 'Margaret Thompson', date: '2026-02-22', clockIn: '13:00', clockOut: '', method: 'GPS', verified: false, visitNotes: '' },
-  { id: 'e3', caregiver: 'Angela Davis', client: 'Dorothy Williams', date: '2026-02-22', clockIn: '09:30', clockOut: '14:00', method: 'Telephony', verified: true, visitNotes: 'Medication administered. PT exercises assisted. Client mood: good.' },
-  { id: 'e4', caregiver: 'Robert Kim', client: 'Frank Morales', date: '2026-02-21', clockIn: '10:00', clockOut: '14:00', method: 'GPS', verified: true, visitNotes: 'Personal care completed. Client calm and cooperative.' },
-];
-
-const openShifts = [
-  { id: 'os1', client: 'Margaret Thompson', date: '2026-02-24', time: '8:00 AM – 12:00 PM', tasks: ['Personal Care', 'Medication Reminding'], location: 'Portland', priority: 'High' },
-  { id: 'os2', client: 'Harold Jenkins', date: '2026-02-23', time: '2:00 PM – 6:00 PM', tasks: ['Personal Care', 'Medication Administration'], location: 'Portland', priority: 'Urgent' },
-  { id: 'os3', client: 'Frank Morales', date: '2026-02-25', time: '10:00 AM – 2:00 PM', tasks: ['Personal Care', 'Housekeeping'], location: 'Salem', priority: 'Normal' },
-];
 
 export default function Scheduling() {
-  const { clients, caregivers } = useAppStore();
+  const { clients, caregivers, shifts } = useAppStore();
   const [tab, setTab] = useState<ScheduleTab>('week');
   const [weekStart] = useState(startOfWeek(new Date()));
   const [showNewShift, setShowNewShift] = useState(false);
 
   const weekDays = DAYS.map((_, i) => addDays(weekStart, i));
 
-  // Demo weekly shifts
-  const weekShifts = [
-    { day: 1, caregiver: 'Maria Santos', client: 'Margaret Thompson', start: '08:00', end: '12:00', color: 'bg-blue-100 border-blue-300 text-blue-800' },
-    { day: 1, caregiver: 'Angela Davis', client: 'Dorothy Williams', start: '09:30', end: '14:00', color: 'bg-teal-100 border-teal-300 text-teal-800' },
-    { day: 2, caregiver: 'James Wilson', client: 'Margaret Thompson', start: '08:00', end: '16:00', color: 'bg-purple-100 border-purple-300 text-purple-800' },
-    { day: 3, caregiver: 'Robert Kim', client: 'Frank Morales', start: '10:00', end: '14:00', color: 'bg-green-100 border-green-300 text-green-800' },
-    { day: 4, caregiver: 'Maria Santos', client: 'Harold Jenkins', start: '14:00', end: '18:00', color: 'bg-amber-100 border-amber-300 text-amber-800' },
-    { day: 5, caregiver: 'Angela Davis', client: 'Dorothy Williams', start: '09:00', end: '14:00', color: 'bg-teal-100 border-teal-300 text-teal-800' },
-  ];
 
   return (
     <div className="space-y-6">
@@ -51,7 +30,7 @@ export default function Scheduling() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200">
-        {([['week', 'Weekly Schedule'], ['evv', 'EVV Log'], ['openShifts', `Open Shifts (${openShifts.length})`]] as [ScheduleTab, string][]).map(([id, label]) => (
+        {([['week', 'Weekly Schedule'], ['evv', 'EVV Log'], ['openShifts', 'Open Shifts']] as [ScheduleTab, string][]).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${tab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>{label}</button>
         ))}
       </div>
@@ -68,27 +47,38 @@ export default function Scheduling() {
               </div>
             ))}
           </div>
-          {caregivers.slice(0, 4).map(cg => (
-            <div key={cg.id} className="grid grid-cols-8 border-b border-slate-100">
-              <div className="p-3 border-r border-slate-100">
-                <div className="text-sm font-medium text-slate-700">{cg.name.split(' ')[0]}</div>
-                <div className="text-xs text-slate-400">{cg.location}</div>
-              </div>
-              {weekDays.map((_, dayIdx) => {
-                const shift = weekShifts.find(s => s.day === dayIdx && s.caregiver.split(' ')[0] === cg.name.split(' ')[0]);
-                return (
-                  <div key={dayIdx} className="p-1.5 border-l border-slate-100 min-h-16">
-                    {shift && (
-                      <div className={`text-xs p-1.5 rounded border ${shift.color}`}>
-                        <div className="font-medium truncate">{shift.client.split(' ')[0]}</div>
-                        <div className="opacity-75">{shift.start}–{shift.end}</div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          {caregivers.length === 0 ? (
+            <div className="p-12 text-center text-slate-400">
+              <Clock size={32} className="mx-auto mb-3 opacity-40" />
+              <p className="text-sm font-medium">No caregivers added yet</p>
+              <p className="text-xs mt-1">Add caregivers to start building the schedule</p>
             </div>
-          ))}
+          ) : (
+            caregivers.slice(0, 10).map(cg => (
+              <div key={cg.id} className="grid grid-cols-8 border-b border-slate-100">
+                <div className="p-3 border-r border-slate-100">
+                  <div className="text-sm font-medium text-slate-700">{cg.name.split(' ')[0]}</div>
+                  <div className="text-xs text-slate-400">{cg.location}</div>
+                </div>
+                {weekDays.map((day, dayIdx) => {
+                  const dayStr = format(day, 'yyyy-MM-dd');
+                  const shift = shifts.find(s => s.caregiverId === cg.id && s.date === dayStr);
+                  return (
+                    <div key={dayIdx} className="p-1.5 border-l border-slate-100 min-h-16">
+                      {shift && (
+                        <div className="text-xs p-1.5 rounded border bg-blue-100 border-blue-300 text-blue-800">
+                          <div className="font-medium truncate">
+                            {clients.find(c => c.id === shift.clientId)?.name.split(' ')[0] ?? 'Client'}
+                          </div>
+                          <div className="opacity-75">{shift.startTime}–{shift.endTime}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -110,25 +100,39 @@ export default function Scheduling() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {demoEVV.map(ev => (
-                  <tr key={ev.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-sm font-medium text-slate-700">{ev.caregiver}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{ev.client}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{ev.date}</td>
-                    <td className="px-4 py-3 text-sm">{ev.clockIn}</td>
-                    <td className="px-4 py-3 text-sm">{ev.clockOut || <span className="text-amber-500">Active</span>}</td>
-                    <td className="px-4 py-3">
-                      <span className="flex items-center gap-1 text-xs">
-                        {ev.method === 'GPS' ? <MapPin size={12} className="text-green-600" /> : <Phone size={12} className="text-blue-600" />}
-                        {ev.method}
-                      </span>
+                {shifts.filter(s => s.evvClockIn).length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
+                      <Radio size={28} className="mx-auto mb-3 opacity-40" />
+                      <p className="text-sm font-medium">No EVV records yet</p>
+                      <p className="text-xs mt-1">Clock-in records will appear here once caregivers begin shifts</p>
                     </td>
-                    <td className="px-4 py-3">
-                      {ev.verified ? <span className="badge-green flex items-center gap-1 w-fit"><CheckCircle size={11} /> Verified</span> : <span className="badge-yellow flex items-center gap-1 w-fit"><Clock size={11} /> Pending</span>}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-500 max-w-32 truncate">{ev.visitNotes || '—'}</td>
                   </tr>
-                ))}
+                ) : (
+                  shifts.filter(s => s.evvClockIn).map(ev => {
+                    const cg = caregivers.find(c => c.id === ev.caregiverId);
+                    const cl = clients.find(c => c.id === ev.clientId);
+                    return (
+                      <tr key={ev.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm font-medium text-slate-700">{cg?.name ?? ev.caregiverId}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{cl?.name ?? ev.clientId}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{ev.date}</td>
+                        <td className="px-4 py-3 text-sm">{ev.evvClockIn}</td>
+                        <td className="px-4 py-3 text-sm">{ev.evvClockOut || <span className="text-amber-500">Active</span>}</td>
+                        <td className="px-4 py-3">
+                          <span className="flex items-center gap-1 text-xs">
+                            {ev.evvMethod === 'GPS' ? <MapPin size={12} className="text-green-600" /> : <Phone size={12} className="text-blue-600" />}
+                            {ev.evvMethod ?? '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {ev.evvVerified ? <span className="badge-green flex items-center gap-1 w-fit"><CheckCircle size={11} /> Verified</span> : <span className="badge-yellow flex items-center gap-1 w-fit"><Clock size={11} /> Pending</span>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 max-w-32 truncate">{ev.notes || '—'}</td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -138,21 +142,31 @@ export default function Scheduling() {
       {/* OPEN SHIFTS */}
       {tab === 'openShifts' && (
         <div className="space-y-3">
-          {openShifts.map(shift => (
-            <div key={shift.id} className="card p-4 flex items-center gap-4">
-              <div className={`w-2 h-12 rounded-full flex-shrink-0 ${shift.priority === 'Urgent' ? 'bg-red-500' : shift.priority === 'High' ? 'bg-amber-400' : 'bg-slate-300'}`} />
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-slate-900">{shift.client}</div>
-                <div className="text-sm text-slate-500">{shift.date} · {shift.time} · {shift.location}</div>
-                <div className="flex gap-1 mt-1">{shift.tasks.map(t => <span key={t} className="badge-blue">{t}</span>)}</div>
-              </div>
-              <span className={`text-xs font-bold px-2 py-1 rounded ${shift.priority === 'Urgent' ? 'bg-red-100 text-red-700' : shift.priority === 'High' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>{shift.priority}</span>
-              <div className="flex gap-2">
-                <button className="btn-secondary text-xs">Assign</button>
-                <button className="btn-primary text-xs flex items-center gap-1"><Radio size={12} /> Broadcast</button>
-              </div>
+          {shifts.filter(s => !s.caregiverId || s.status === 'Scheduled').length === 0 ? (
+            <div className="card p-12 text-center text-slate-400">
+              <CheckCircle size={32} className="mx-auto mb-3 opacity-40" />
+              <p className="text-sm font-medium">No open shifts</p>
+              <p className="text-xs mt-1">Unassigned shifts will appear here once created</p>
             </div>
-          ))}
+          ) : (
+            shifts.filter(s => !s.caregiverId).map(shift => {
+              const cl = clients.find(c => c.id === shift.clientId);
+              return (
+                <div key={shift.id} className="card p-4 flex items-center gap-4">
+                  <div className="w-2 h-12 rounded-full flex-shrink-0 bg-amber-400" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-slate-900">{cl?.name ?? shift.clientId}</div>
+                    <div className="text-sm text-slate-500">{shift.date} · {shift.startTime}–{shift.endTime} · {shift.location}</div>
+                    <div className="flex gap-1 mt-1">{shift.tasks.map(t => <span key={t} className="badge-blue">{t}</span>)}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="btn-secondary text-xs">Assign</button>
+                    <button className="btn-primary text-xs flex items-center gap-1"><Radio size={12} /> Broadcast</button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 

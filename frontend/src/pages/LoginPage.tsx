@@ -102,25 +102,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-xs font-medium text-slate-400 mb-2">Demo credentials</p>
-            <div className="space-y-1.5">
-              <button
-                onClick={() => { setEmail('admin@careaxis.io'); setPassword('admin123'); }}
-                className="w-full text-left px-3 py-2 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-colors"
-              >
-                <div className="text-xs font-medium text-slate-700">Platform Admin</div>
-                <div className="text-xs text-slate-400">admin@careaxis.io</div>
-              </button>
-              <button
-                onClick={() => { setEmail('jennifer@portlandhomecare.com'); setPassword('demo123'); }}
-                className="w-full text-left px-3 py-2 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 transition-colors"
-              >
-                <div className="text-xs font-medium text-slate-700">Agency Administrator</div>
-                <div className="text-xs text-slate-400">jennifer@portlandhomecare.com</div>
-              </button>
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-slate-500 text-xs mt-6">

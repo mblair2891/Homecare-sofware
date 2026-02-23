@@ -17,11 +17,7 @@ const reportLibrary = [
   { id: 'r12', category: 'Operations', name: 'Open Shift Report', desc: 'Unfilled shifts by location and date', icon: '📅' },
 ];
 
-const scheduledReports = [
-  { name: 'Weekly EVV Compliance Summary', frequency: 'Every Monday', recipients: 'Jennifer Adams, Michael Torres', format: 'PDF' },
-  { name: 'Monthly Revenue Report', frequency: '1st of month', recipients: 'Jennifer Adams', format: 'Excel' },
-  { name: 'Quarterly Compliance Report', frequency: 'Quarterly', recipients: 'All Administrators', format: 'PDF' },
-];
+const scheduledReports: { name: string; frequency: string; recipients: string; format: string }[] = [];
 
 const categories = ['All', 'Compliance', 'Financial', 'Clinical', 'Operations'];
 
@@ -41,7 +37,7 @@ export default function Reports() {
 
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
-        {([['Reports Run (Feb)', '47', BarChart3, 'bg-blue-600'], ['Scheduled Reports', '3', Calendar, 'bg-teal-600'], ['Data Exports', '12', Download, 'bg-green-600'], ['Custom Reports', '5', TrendingUp, 'bg-purple-600']] as [string, string, React.ElementType, string][]).map(([label, value, Icon, bg]) => (
+        {([['Reports Run', '—', BarChart3, 'bg-blue-600'], ['Scheduled Reports', String(scheduledReports.length), Calendar, 'bg-teal-600'], ['Data Exports', '—', Download, 'bg-green-600'], ['Custom Reports', '—', TrendingUp, 'bg-purple-600']] as [string, string, React.ElementType, string][]).map(([label, value, Icon, bg]) => (
           <div key={label} className="card p-4 flex items-start gap-3">
             <div className={`p-2.5 rounded-lg ${bg}`}><Icon size={18} className="text-white" /></div>
             <div><div className="text-xl font-bold">{value}</div><div className="text-xs text-slate-500">{label}</div></div>
@@ -89,7 +85,14 @@ export default function Reports() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {scheduledReports.map((rep, i) => (
+              {scheduledReports.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                    <p className="text-sm font-medium">No scheduled reports</p>
+                    <p className="text-xs mt-1">Set up recurring reports to automate delivery</p>
+                  </td>
+                </tr>
+              ) : scheduledReports.map((rep, i) => (
                 <tr key={i} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-sm font-medium">{rep.name}</td>
                   <td className="px-4 py-3 text-sm text-slate-500">{rep.frequency}</td>
@@ -109,8 +112,8 @@ export default function Reports() {
           <div className="space-y-4">
             <p className="text-sm text-slate-600">{generateReport.desc}</p>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="form-label">Date Range Start</label><input type="date" className="form-input" defaultValue="2026-02-01" /></div>
-              <div><label className="form-label">Date Range End</label><input type="date" className="form-input" defaultValue="2026-02-28" /></div>
+              <div><label className="form-label">Date Range Start</label><input type="date" className="form-input" /></div>
+              <div><label className="form-label">Date Range End</label><input type="date" className="form-input" /></div>
               <div><label className="form-label">Location</label><select className="form-input"><option>All Locations</option><option>Portland</option><option>Eugene</option><option>Salem</option></select></div>
               <div><label className="form-label">Format</label><select className="form-input"><option>PDF</option><option>Excel (.xlsx)</option><option>CSV</option></select></div>
               <div className="col-span-2"><label className="form-label">Email to (optional)</label><input className="form-input" placeholder="email@example.com" /></div>

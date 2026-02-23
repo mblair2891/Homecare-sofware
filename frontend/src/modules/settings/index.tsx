@@ -16,12 +16,7 @@ const integrations = [
   { name: 'Google Maps', desc: 'Caregiver location verification', status: 'Not Connected', icon: '🗺️' },
 ];
 
-const users = [
-  { name: 'Jennifer Adams', email: 'jadams@careaxis.com', role: 'Administrator', location: 'All', status: 'Active' },
-  { name: 'Michael Torres', email: 'mtorres@careaxis.com', role: 'Administrator', location: 'Eugene', status: 'Active' },
-  { name: 'Lisa Chang', email: 'lchang@careaxis.com', role: 'Coordinator', location: 'Salem', status: 'Active' },
-  { name: 'Angela Davis', email: 'adavis@careaxis.com', role: 'Nurse (RN)', location: 'Eugene', status: 'Active' },
-];
+const users: { name: string; email: string; role: string; location: string; status: string }[] = [];
 
 const billingRates = [
   { service: 'Personal Care — Hourly', rate: '$28.00', payer: 'Private Pay' },
@@ -57,16 +52,16 @@ export default function SettingsModule() {
         <div className="card p-6 space-y-4 max-w-2xl">
           <h2 className="font-semibold text-slate-800">Agency Information</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className="form-label">Agency Name</label><input className="form-input" defaultValue="CareAxis Home Care" /></div>
-            <div><label className="form-label">OHA License Classification</label><select className="form-input"><option>Limited</option><option>Basic</option><option selected>Intermediate</option><option>Comprehensive</option></select></div>
-            <div><label className="form-label">Primary License Number</label><input className="form-input" defaultValue="IHC-2024-001" /></div>
-            <div><label className="form-label">License Expiry</label><input type="date" className="form-input" defaultValue="2025-07-01" /></div>
-            <div className="col-span-2"><label className="form-label">Primary Address</label><input className="form-input" defaultValue="100 SW Broadway, Portland, OR 97201" /></div>
-            <div><label className="form-label">Phone</label><input className="form-input" defaultValue="(503) 555-1000" /></div>
-            <div><label className="form-label">Fax</label><input className="form-input" defaultValue="(503) 555-1001" /></div>
-            <div><label className="form-label">Email</label><input className="form-input" defaultValue="info@careaxis.com" /></div>
-            <div><label className="form-label">Website</label><input className="form-input" defaultValue="www.careaxis.com" /></div>
-            <div className="col-span-2"><label className="form-label">Administrator</label><input className="form-input" defaultValue="Jennifer Adams" /></div>
+            <div><label className="form-label">Agency Name</label><input className="form-input" placeholder="Your Agency Name" /></div>
+            <div><label className="form-label">OHA License Classification</label><select className="form-input"><option>Limited</option><option>Basic</option><option>Intermediate</option><option>Comprehensive</option></select></div>
+            <div><label className="form-label">Primary License Number</label><input className="form-input" placeholder="IHC-YYYY-NNN" /></div>
+            <div><label className="form-label">License Expiry</label><input type="date" className="form-input" /></div>
+            <div className="col-span-2"><label className="form-label">Primary Address</label><input className="form-input" placeholder="Street, City, OR ZIP" /></div>
+            <div><label className="form-label">Phone</label><input className="form-input" placeholder="(503) 000-0000" /></div>
+            <div><label className="form-label">Fax</label><input className="form-input" placeholder="(503) 000-0000" /></div>
+            <div><label className="form-label">Email</label><input className="form-input" placeholder="info@youragency.com" /></div>
+            <div><label className="form-label">Website</label><input className="form-input" placeholder="www.youragency.com" /></div>
+            <div className="col-span-2"><label className="form-label">Administrator</label><input className="form-input" placeholder="Administrator Name" /></div>
           </div>
           <button onClick={save} className="btn-primary flex items-center gap-2"><Save size={14} /> Save Changes</button>
         </div>
@@ -138,7 +133,14 @@ export default function SettingsModule() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.map(user => (
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                    <p className="text-sm font-medium">No users added yet</p>
+                    <p className="text-xs mt-1">Add users to manage access and roles</p>
+                  </td>
+                </tr>
+              ) : users.map(user => (
                 <tr key={user.email} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium">{user.name}</div>

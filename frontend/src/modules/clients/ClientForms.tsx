@@ -56,9 +56,9 @@ function CF01({ client }: { client: Client }) {
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Client Name" value={client.name} />
         <FormField label="Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
-        <FormField label="Agency Name" value="CareAxis Home Care" />
+        <FormField label="Agency Name" />
         <FormField label="License Classification" value={client.classification} type="select" options={['Limited', 'Basic', 'Intermediate', 'Comprehensive']} />
-        <FormField label="Agency License Number" value="IHC-2024-001" />
+        <FormField label="Agency License Number" />
         <FormField label="Services Offered" type="select" options={['Personal Care', 'Personal Care + Medication Reminding', 'Personal Care + Medication Assistance', 'Personal Care + Medication Administration', 'Personal Care + Nursing Services']} />
       </div>
       <div>
@@ -66,7 +66,7 @@ function CF01({ client }: { client: Client }) {
         <textarea className="form-input" rows={4} defaultValue="Services include personal care tasks including bathing, grooming, dressing, toileting, mobility, nutrition/hydration, medication reminding, and housekeeping as specified in the client's service plan." />
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Hourly Rate" value="$28.00" />
+        <FormField label="Hourly Rate" />
         <FormField label="Minimum Hours Per Visit" value="2 hours" />
         <FormField label="Billing Frequency" type="select" options={['Weekly', 'Bi-Weekly', 'Monthly']} />
         <FormField label="Payment Due Date" type="select" options={['Upon Receipt', 'Net 15', 'Net 30']} />
@@ -79,7 +79,7 @@ function CF01({ client }: { client: Client }) {
       </div>
       <div>
         <label className="form-label">Administrator / Designee Contact During Service Hours</label>
-        <input className="form-input" defaultValue="(503) 555-1000 — Available 24/7 for emergencies" />
+        <input className="form-input" placeholder="Phone — Available hours" />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -136,7 +136,7 @@ function CF02({ client }: { client: Client }) {
       </div>
       <div className="form-section">
         <h3 className="text-sm font-semibold mb-2">Grievance Procedures (OAR 333-536-0060(2)(a))</h3>
-        <textarea className="form-input" rows={3} defaultValue="To file a grievance with the agency: contact your agency administrator at (503) 555-1000 or submit in writing to 100 SW Broadway, Portland, OR 97201." />
+        <textarea className="form-input" rows={3} placeholder="Describe how a client can file a grievance with the agency (phone, address, etc.)..." />
       </div>
       <div className="form-section">
         <h3 className="text-sm font-semibold mb-2">State Complaint Procedures (OAR 333-536-0060(2)(b))</h3>
@@ -161,7 +161,7 @@ function CF03({ client }: { client: Client }) {
         <FormField label="Client Name" value={client.name} />
         <FormField label="DOB" value={client.dob} type="date" />
         <FormField label="Assessment Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
-        <FormField label="Assessed By" value="Jennifer Adams — Administrator" />
+        <FormField label="Assessed By" />
       </div>
       <div className="form-section">
         <h3 className="text-sm font-semibold mb-3">Activities of Daily Living (ADLs)</h3>
@@ -251,7 +251,7 @@ function CF04({ client }: { client: Client }) {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <FormField label="Scheduled Hours Per Month (range)" value="80–120 hours" />
+        <FormField label="Scheduled Hours Per Month (range)" />
         <FormField label="Visit Frequency" value="Daily" type="select" options={['Daily', '5x/week', '3x/week', '2x/week', 'Weekly', 'As needed']} />
       </div>
       <div className="form-section">
@@ -261,9 +261,11 @@ function CF04({ client }: { client: Client }) {
       <div className="form-section">
         <h3 className="text-sm font-semibold mb-3">Caregiver Pre-Service Review Sign-Off (OAR 333-536-0065(5))</h3>
         <p className="text-xs text-slate-500 mb-2">Each caregiver must review and sign before first visit with this client.</p>
-        {['Maria Santos', 'James Wilson'].map(cg => (
-          <div key={cg} className="flex items-center gap-4 mb-2 p-2 border border-slate-200 rounded">
-            <span className="text-sm flex-1">{cg}</span>
+        {client.assignedCaregivers.length === 0 ? (
+          <p className="text-xs text-slate-400 italic">No caregivers assigned yet. Assign caregivers to this client to populate this section.</p>
+        ) : client.assignedCaregivers.map(cgId => (
+          <div key={cgId} className="flex items-center gap-4 mb-2 p-2 border border-slate-200 rounded">
+            <span className="text-sm flex-1">{cgId}</span>
             <input type="text" className="px-2 py-1 border rounded text-sm w-36" placeholder="Signature" />
             <input type="date" className="form-input w-36" defaultValue={format(new Date(), 'yyyy-MM-dd')} />
           </div>
@@ -301,7 +303,7 @@ function CF08({ client }: { client: Client }) {
         <FormField label="Visit Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
         <FormField label="Visit Start Date" value={client.startDate} type="date" />
         <FormField label="Day of Service (must be 7–30)" value="14" />
-        <FormField label="Visit Conducted By" value="Jennifer Adams — Administrator" />
+        <FormField label="Visit Conducted By" />
         <FormField label="Visit Method" type="select" options={['In-Person (Required)', 'Phone (special circumstances only)', 'Video (special circumstances only)']} />
         <FormField label="Caregiver Present" type="select" options={['Yes', 'No']} />
         <FormField label="Caregiver Name if Present" />
@@ -347,7 +349,7 @@ function CF09({ client }: { client: Client }) {
         <FormField label="Visit Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
         <FormField label="Visit Method" type="select" options={['In-Person', 'Phone (justified below)', 'Video (justified below)']} />
         <FormField label="Last In-Person Visit Date" value={client.lastMonitoringDate} type="date" />
-        <FormField label="Conducted By" value="Jennifer Adams — Administrator" />
+        <FormField label="Conducted By" />
         <FormField label="Caregiver Present" type="select" options={['Yes', 'No']} />
       </div>
       <div className="form-section">
@@ -389,7 +391,7 @@ function CF10({ client }: { client: Client }) {
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Client Name" value={client.name} />
         <FormField label="Assessment Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
-        <FormField label="Assessed By" value="Jennifer Adams — Administrator" />
+        <FormField label="Assessed By" />
         <FormField label="Next Re-Evaluation Due" value={format(new Date(Date.now() + 90 * 86400000), 'yyyy-MM-dd')} type="date" />
       </div>
       <div className="form-section">
@@ -439,7 +441,7 @@ function GenericForm({ client, formId }: { client: Client; formId: string }) {
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Client Name" value={client.name} />
         <FormField label="Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
-        <FormField label="Completed By" value="Jennifer Adams — Administrator" />
+        <FormField label="Completed By" />
       </div>
       <FormField label="Notes / Narrative" type="textarea" />
       <div className="grid grid-cols-2 gap-4">

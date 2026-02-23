@@ -29,15 +29,6 @@ const DEMO_USERS: (AuthUser & { password: string })[] = [
     name: 'Platform Admin',
     role: 'SuperAdmin',
   },
-  {
-    id: 'u-1',
-    email: 'jennifer@portlandhomecare.com',
-    password: 'demo123',
-    name: 'Jennifer Adams',
-    role: 'Administrator',
-    agencyId: 'agency-1',
-    agencyName: 'Portland Home Care',
-  },
 ];
 
 export const useAuthStore = create<AuthStore>()(
