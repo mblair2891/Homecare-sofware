@@ -1,33 +1,41 @@
 import React from 'react';
 import { TrendingUp, Users, Building2, DollarSign, UserCheck, Activity } from 'lucide-react';
+import { usePlatformStore } from '../../store/usePlatformStore';
 
 const monthlyData = [
-  { month: 'Aug', agencies: 1, clients: 12, mrr: 149 },
-  { month: 'Sep', agencies: 2, clients: 25, mrr: 298 },
-  { month: 'Oct', agencies: 2, clients: 38, mrr: 448 },
-  { month: 'Nov', agencies: 3, clients: 56, mrr: 747 },
-  { month: 'Dec', agencies: 3, clients: 68, mrr: 747 },
-  { month: 'Jan', agencies: 4, clients: 84, mrr: 1047 },
-  { month: 'Feb', agencies: 4, clients: 94, mrr: 1047 },
+  { month: 'Aug', companies: 1, clients: 12, mrr: 149 },
+  { month: 'Sep', companies: 2, clients: 25, mrr: 298 },
+  { month: 'Oct', companies: 2, clients: 38, mrr: 448 },
+  { month: 'Nov', companies: 3, clients: 56, mrr: 747 },
+  { month: 'Dec', companies: 3, clients: 68, mrr: 747 },
+  { month: 'Jan', companies: 4, clients: 84, mrr: 1047 },
+  { month: 'Feb', companies: 4, clients: 94, mrr: 1047 },
 ];
 
 const maxMrr = Math.max(...monthlyData.map((d) => d.mrr));
 
-const metrics = [
-  { label: 'Active Agencies', value: '3', change: '+1 this month', icon: Building2, color: 'text-blue-600 bg-blue-50' },
-  { label: 'Total Clients', value: '94', change: '+10 this month', icon: Users, color: 'text-teal-600 bg-teal-50' },
-  { label: 'Total Caregivers', value: '63', change: '+7 this month', icon: UserCheck, color: 'text-green-600 bg-green-50' },
-  { label: 'MRR', value: '$1,047', change: '+$300 this month', icon: DollarSign, color: 'text-purple-600 bg-purple-50' },
-];
-
-const planBreakdown = [
-  { plan: 'Enterprise', count: 1, mrr: 599, color: 'bg-purple-500' },
-  { plan: 'Professional', count: 1, mrr: 299, color: 'bg-blue-500' },
-  { plan: 'Starter', count: 1, mrr: 149, color: 'bg-slate-400' },
-  { plan: 'Trial', count: 1, mrr: 0, color: 'bg-amber-400' },
-];
 
 export default function PlatformAnalyticsPage() {
+  const { companies } = usePlatformStore();
+  const activeCompanies = companies.filter((c) => c.status === 'Active').length;
+  const totalClients = companies.reduce((s, c) => s + c.agencies.reduce((a, ag) => a + ag.clients, 0), 0);
+  const totalCaregivers = companies.reduce((s, c) => s + c.agencies.reduce((a, ag) => a + ag.caregivers, 0), 0);
+  const totalMrr = companies.filter((c) => c.status === 'Active').reduce((s, c) => s + c.mrr, 0);
+
+  const planBreakdown = [
+    { plan: 'Enterprise', count: companies.filter((c) => c.plan === 'Enterprise').length, mrr: companies.filter((c) => c.plan === 'Enterprise').reduce((s, c) => s + c.mrr, 0), color: 'bg-purple-500' },
+    { plan: 'Professional', count: companies.filter((c) => c.plan === 'Professional').length, mrr: companies.filter((c) => c.plan === 'Professional').reduce((s, c) => s + c.mrr, 0), color: 'bg-blue-500' },
+    { plan: 'Starter', count: companies.filter((c) => c.plan === 'Starter').length, mrr: companies.filter((c) => c.plan === 'Starter').reduce((s, c) => s + c.mrr, 0), color: 'bg-slate-400' },
+    { plan: 'Trial', count: companies.filter((c) => c.plan === 'Trial').length, mrr: 0, color: 'bg-amber-400' },
+  ];
+
+  const metrics = [
+    { label: 'Active Companies', value: String(activeCompanies), change: `${companies.length} total`, icon: Building2, color: 'text-blue-600 bg-blue-50' },
+    { label: 'Total Clients', value: String(totalClients), change: 'across all agencies', icon: Users, color: 'text-teal-600 bg-teal-50' },
+    { label: 'Total Caregivers', value: String(totalCaregivers), change: 'across all agencies', icon: UserCheck, color: 'text-green-600 bg-green-50' },
+    { label: 'MRR', value: `$${totalMrr.toLocaleString()}`, change: `$${(totalMrr * 12).toLocaleString()} projected ARR`, icon: DollarSign, color: 'text-purple-600 bg-purple-50' },
+  ];
+
   return (
     <div className="p-6 space-y-6">
       {/* KPI Cards */}
@@ -126,7 +134,7 @@ export default function PlatformAnalyticsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100">
-                {['Month', 'Agencies', 'Clients', 'MRR', 'MoM Growth'].map((h) => (
+                {['Month', 'Companies', 'Clients', 'MRR', 'MoM Growth'].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -138,7 +146,7 @@ export default function PlatformAnalyticsPage() {
                 return (
                   <tr key={row.month} className="hover:bg-slate-50">
                     <td className="px-5 py-3 font-medium text-slate-700">{row.month} 2025</td>
-                    <td className="px-5 py-3 text-slate-600">{row.agencies}</td>
+                    <td className="px-5 py-3 text-slate-600">{row.companies}</td>
                     <td className="px-5 py-3 text-slate-600">{row.clients}</td>
                     <td className="px-5 py-3 font-medium text-slate-700">${row.mrr.toLocaleString()}</td>
                     <td className="px-5 py-3">
