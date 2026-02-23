@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BookOpen, Search, ChevronRight, ChevronLeft, CheckCircle, MessageSquare, Download, Loader } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Search, ChevronRight, ChevronLeft, CheckCircle, MessageSquare, Download, Loader, FileText, Printer, ChevronDown, Building2, Upload } from 'lucide-react';
 
 type PPStep = 'landing' | 'scanning' | 'review' | 'done';
 
@@ -13,6 +13,7 @@ interface PolicySection {
   accepted: boolean;
   concern?: string;
   revised?: string;
+  forms?: string[];
 }
 
 const oregonSections: Omit<PolicySection, 'accepted'>[] = [
@@ -54,7 +55,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0050
 REVIEW SCHEDULE: Annually each January, or within 30 days of any organizational change`,
-    explanation: 'OAR 333-536-0050 requires written documentation of organizational structure, geographic service area (60-mile limit), and clear distinction between parent/subunit/branch offices. This is reviewed during every OHA survey.'
+    explanation: 'OAR 333-536-0050 requires written documentation of organizational structure, geographic service area (60-mile limit), and clear distinction between parent/subunit/branch offices. This is reviewed during every OHA survey.',
+    forms: ['Annual Organizational Structure Review Form'],
   },
   {
     id: 'admin', oar: 'OAR 333-536-0052', title: 'Administrator Qualifications & Duties',
@@ -101,7 +103,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0052
 REVIEW SCHEDULE: Annually, or whenever the Administrator position changes`,
-    explanation: 'OAR 333-536-0052 requires a qualified administrator (HS diploma + 2yr management in health field) who is accessible 24/7 when services are provided. This is one of the most frequently cited deficiencies in OHA surveys.'
+    explanation: 'OAR 333-536-0052 requires a qualified administrator (HS diploma + 2yr management in health field) who is accessible 24/7 when services are provided. This is one of the most frequently cited deficiencies in OHA surveys.',
+    forms: ['Administrator Designee Appointment Form', 'Administrator On-Call Schedule'],
   },
   {
     id: 'personnel', oar: 'OAR 333-536-0053', title: 'Personnel Records Requirements',
@@ -156,7 +159,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0053
 REVIEW SCHEDULE: Quarterly file audits; annual policy review`,
-    explanation: 'OAR 333-536-0053 specifies exactly what must be in each caregiver\'s personnel file. Surveyors will audit these files. Missing documentation — especially training records and background checks — is the most common survey deficiency.'
+    explanation: 'OAR 333-536-0053 specifies exactly what must be in each caregiver\'s personnel file. Surveyors will audit these files. Missing documentation — especially training records and background checks — is the most common survey deficiency.',
+    forms: ['Personnel File Checklist'],
   },
   {
     id: 'orient', oar: 'OAR 333-536-0070(5)', title: 'Caregiver Orientation (≥4 Hours)',
@@ -214,7 +218,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0070(5)
 REVIEW SCHEDULE: Annually; update orientation content whenever agency policies change`,
-    explanation: 'Required by OAR 333-536-0070(5). Minimum 4 hours, can be online or in-person. Must occur BEFORE the caregiver independently provides services. Competency evaluation must also be completed before independent service.'
+    explanation: 'Required by OAR 333-536-0070(5). Minimum 4 hours, can be online or in-person. Must occur BEFORE the caregiver independently provides services. Competency evaluation must also be completed before independent service.',
+    forms: ['Orientation Attendance Sheet', 'Orientation Completion Form', 'Orientation Knowledge Quiz (10 Questions)'],
   },
   {
     id: 'training', oar: 'OAR 333-536-0070(7)', title: 'Initial Caregiver Training (8 Hours)',
@@ -279,7 +284,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0070(7)
 REVIEW SCHEDULE: Annually; review training curriculum whenever regulations are amended`,
-    explanation: 'OAR 333-536-0070(7) requires 8 total hours with 2 hours before service. The 120-day completion window for the remaining 6 hours is a grace period — but the 2-hour before-service requirement is absolute.'
+    explanation: 'OAR 333-536-0070(7) requires 8 total hours with 2 hours before service. The 120-day completion window for the remaining 6 hours is a grace period — but the 2-hour before-service requirement is absolute.',
+    forms: ['Initial Training Tracker', 'Caregiver Competency Verification Form'],
   },
   {
     id: 'medtrain', oar: 'OAR 333-536-0070(8)', title: 'Medication Services Training (4 Hours)',
@@ -349,7 +355,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0070(8)
 REVIEW SCHEDULE: Annually; update training materials when medication regulations change`,
-    explanation: 'Required by OAR 333-536-0070(8) for any caregiver providing medication assistance or administration. The return demonstration requirement is mandatory and must be documented by a qualified individual (RN, LPN, pharmacist, etc.).'
+    explanation: 'Required by OAR 333-536-0070(8) for any caregiver providing medication assistance or administration. The return demonstration requirement is mandatory and must be documented by a qualified individual (RN, LPN, pharmacist, etc.).',
+    forms: ['Medication Training Attendance Sheet', 'Medication Return Demonstration Evaluation Form'],
   },
   {
     id: 'annualtrain', oar: 'OAR 333-536-0070(14)', title: 'Annual Training (6+ Hours)',
@@ -403,7 +410,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0070(14)
 REVIEW SCHEDULE: Training calendar updated annually; individual tracking reviewed monthly`,
-    explanation: 'OAR 333-536-0070(14) requires 6 hours annually (7 if providing medication services). This is separate from the initial training requirement. Missing annual training is one of the most common OHA survey deficiencies.'
+    explanation: 'OAR 333-536-0070(14) requires 6 hours annually (7 if providing medication services). This is separate from the initial training requirement. Missing annual training is one of the most common OHA survey deficiencies.',
+    forms: ['Annual Training Tracker', 'Annual Training Completion Certificate'],
   },
   {
     id: 'svcplan', oar: 'OAR 333-536-0065', title: 'Service Plan Requirements',
@@ -470,7 +478,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0065
 REVIEW SCHEDULE: Each service plan reviewed at minimum every 6 months; policy reviewed annually`,
-    explanation: 'OAR 333-536-0065 requires the service plan within 7 days — not 7 business days, 7 calendar days. The pre-service caregiver review with documented signatures is mandatory and a frequent survey finding when missing.'
+    explanation: 'OAR 333-536-0065 requires the service plan within 7 days — not 7 business days, 7 calendar days. The pre-service caregiver review with documented signatures is mandatory and a frequent survey finding when missing.',
+    forms: ['Initial Client Evaluation Form', 'Client Service Plan', 'Service Plan Caregiver Review & Acknowledgment'],
   },
   {
     id: 'monitor', oar: 'OAR 333-536-0066', title: 'Monitoring Visit Requirements',
@@ -528,7 +537,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0066
 REVIEW SCHEDULE: Monthly review of visit schedule compliance; annual policy review`,
-    explanation: 'OAR 333-536-0066 is one of the most complex compliance requirements. The Day 7–30 initial visit window is absolute. Quarterly visits with 6-month in-person maximum — violating this is a citable deficiency. All 8 monitoring items must be documented.'
+    explanation: 'OAR 333-536-0066 is one of the most complex compliance requirements. The Day 7–30 initial visit window is absolute. Quarterly visits with 6-month in-person maximum — violating this is a citable deficiency. All 8 monitoring items must be documented.',
+    forms: ['Initial Monitoring Visit Form (Day 7–30)', 'Quarterly Monitoring Visit Form'],
   },
   {
     id: 'bgcheck', oar: 'OAR 333-536-0093', title: 'Criminal Records Check Policy',
@@ -596,7 +606,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0093
 REVIEW SCHEDULE: Monthly review of upcoming renewal dates; annual policy review`,
-    explanation: 'OAR 333-536-0093 is extensive. Key points surveyors check: (1) was check done BEFORE hire, (2) is LEIE documented, (3) are 3-year renewals tracked, (4) is there a written weighing test policy for non-disqualifying convictions.'
+    explanation: 'OAR 333-536-0093 is extensive. Key points surveyors check: (1) was check done BEFORE hire, (2) is LEIE documented, (3) are 3-year renewals tracked, (4) is there a written weighing test policy for non-disqualifying convictions.',
+    forms: ['Background Check Authorization Form', 'Fitness Determination Form', 'Preliminary Hire Supervision Plan'],
   },
   {
     id: 'disclosure', oar: 'OAR 333-536-0055', title: 'Client Disclosure & Acceptance',
@@ -665,7 +676,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0055
 REVIEW SCHEDULE: Review disclosure template annually and whenever fee schedules change`,
-    explanation: 'OAR 333-536-0055 requires the disclosure statement BEFORE care begins — not at the first visit. Missing disclosure statements are a common survey finding. The stable-and-predictable determination must be documented and drives what services can be provided.'
+    explanation: 'OAR 333-536-0055 requires the disclosure statement BEFORE care begins — not at the first visit. Missing disclosure statements are a common survey finding. The stable-and-predictable determination must be documented and drives what services can be provided.',
+    forms: ['Client Disclosure Statement', 'Client Acceptance Evaluation Checklist'],
   },
   {
     id: 'clientrights', oar: 'OAR 333-536-0060', title: "Client Rights Notice",
@@ -741,7 +753,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0060
 REVIEW SCHEDULE: Annually; immediately if regulations change`,
-    explanation: 'OAR 333-536-0060 lists 13 specific rights. Every client must receive these in writing as part of the disclosure statement before care begins. The 30-day termination notice requirement has two exceptions that must be in your policies.'
+    explanation: 'OAR 333-536-0060 lists 13 specific rights. Every client must receive these in writing as part of the disclosure statement before care begins. The 30-day termination notice requirement has two exceptions that must be in your policies.',
+    forms: ['Client Rights Acknowledgment Form', 'Client Grievance Form'],
   },
   {
     id: 'infectioncontrol', oar: 'OAR 333-536-0082', title: 'Infection Control Program',
@@ -810,7 +823,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0082
 REVIEW SCHEDULE: Annually; immediately when new public health guidance is issued`,
-    explanation: 'OAR 333-536-0082 requires a written infection control program. This became more prominent after COVID-19. Surveyors check for written policies AND evidence that caregivers were trained.'
+    explanation: 'OAR 333-536-0082 requires a written infection control program. This became more prominent after COVID-19. Surveyors check for written policies AND evidence that caregivers were trained.',
+    forms: ['Bloodborne Pathogen Exposure Report', 'PPE Kit Distribution Log'],
   },
   {
     id: 'records', oar: 'OAR 333-536-0085', title: 'Client Records Management',
@@ -886,7 +900,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0085
 REVIEW SCHEDULE: Quarterly audit of random client files for completeness; annual policy review`,
-    explanation: 'OAR 333-536-0085 requires daily caregiver notes documenting tasks, client observation, AND concerns. This was strengthened in 2021. The 7-year retention requirement is absolute. Surveyors will review records for completeness.'
+    explanation: 'OAR 333-536-0085 requires daily caregiver notes documenting tasks, client observation, AND concerns. This was strengthened in 2021. The 7-year retention requirement is absolute. Surveyors will review records for completeness.',
+    forms: ['Client File Checklist', 'Daily Caregiver Notes Template', 'End-of-Service Summary Form', 'Record Disposal Log'],
   },
   {
     id: 'qa', oar: 'OAR 333-536-0090', title: 'Quality Assessment & Performance Improvement',
@@ -958,7 +973,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0090
 REVIEW SCHEDULE: Quarterly meetings; annual review of quality indicators and committee composition`,
-    explanation: 'OAR 333-536-0090 requires documented quarterly QAPI meetings. The committee composition requirement (RN for Intermediate/Comprehensive) is frequently missed. Meeting minutes must specifically address the three required elements.'
+    explanation: 'OAR 333-536-0090 requires documented quarterly QAPI meetings. The committee composition requirement (RN for Intermediate/Comprehensive) is frequently missed. Meeting minutes must specifically address the three required elements.',
+    forms: ['QAPI Meeting Minutes Template', 'QAPI Corrective Action Log', 'Quality Indicator Tracking Sheet'],
   },
   {
     id: 'complaints', oar: 'OAR 333-536-0042, 0043', title: 'Complaint Investigation & Reporting',
@@ -1031,7 +1047,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0042, 0043
 REVIEW SCHEDULE: Review all open investigations monthly; annual policy review`,
-    explanation: 'OAR 333-536-0052(6)(i) requires timely reporting of abuse to appropriate authorities. Failure to report is a citable violation. Your policies must specify who receives internal reports and the escalation path to external agencies.'
+    explanation: 'OAR 333-536-0052(6)(i) requires timely reporting of abuse to appropriate authorities. Failure to report is a citable violation. Your policies must specify who receives internal reports and the escalation path to external agencies.',
+    forms: ['Incident Report Form', 'Investigation Summary Form', 'Mandatory Abuse Report Form'],
   },
   {
     id: 'enforcement', oar: 'OAR 333-536-0117, 0120', title: 'Survey Deficiency & Plan of Correction',
@@ -1098,7 +1115,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0117, 0120
 REVIEW SCHEDULE: Continuously during active POC period; annually as part of survey preparedness review`,
-    explanation: 'OAR 333-536-0117 gives you 10 business days to submit a POC and 60 days to correct deficiencies. Missing the POC deadline can itself result in additional enforcement action. Having this process documented protects the agency.'
+    explanation: 'OAR 333-536-0117 gives you 10 business days to submit a POC and 60 days to correct deficiencies. Missing the POC deadline can itself result in additional enforcement action. Having this process documented protects the agency.',
+    forms: ['Plan of Correction Template', 'Deficiency Corrective Action Tracking Spreadsheet'],
   },
   {
     id: 'civil', oar: 'OAR 333-536-0125', title: 'Civil Penalties & Violations',
@@ -1175,7 +1193,8 @@ DOCUMENTATION:
 
 REGULATORY REFERENCE: OAR 333-536-0125
 REVIEW SCHEDULE: Compliance Calendar reviewed weekly; Self-audit monthly; Full policy review annually`,
-    explanation: 'Understanding civil penalty structure helps prioritize compliance efforts. At $1,000/day for continuing violations, even minor documentation failures can become expensive. This section should be in your policies as a reminder of regulatory stakes.'
+    explanation: 'Understanding civil penalty structure helps prioritize compliance efforts. At $1,000/day for continuing violations, even minor documentation failures can become expensive. This section should be in your policies as a reminder of regulatory stakes.',
+    forms: ['Compliance Self-Audit Checklist', 'Compliance Calendar Template'],
   },
 ];
 
@@ -1183,6 +1202,13 @@ export default function Policies() {
   const [step, setStep] = useState<PPStep>('landing');
   const [state, setState] = useState('OR');
   const [classification, setClassification] = useState('Basic');
+
+  // Agency branding
+  const [agencyName, setAgencyName] = useState('');
+  const [agencyTagline, setAgencyTagline] = useState('');
+  const [agencyLogo, setAgencyLogo] = useState<string>('');
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
   const [scanLog, setScanLog] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
   const [sections, setSections] = useState<PolicySection[]>([]);
@@ -1195,6 +1221,69 @@ export default function Policies() {
   const [followUpQuestion, setFollowUpQuestion] = useState('');
   const [followUpAnswer, setFollowUpAnswer] = useState('');
   const [followUpLoading, setFollowUpLoading] = useState(false);
+
+  // Form generation
+  const [generatedForms, setGeneratedForms] = useState<Record<string, string>>({});
+  const [generatingForm, setGeneratingForm] = useState<string | null>(null);
+  const [activeFormModal, setActiveFormModal] = useState<string | null>(null);
+  const [showFormsPanel, setShowFormsPanel] = useState(false);
+
+  // Helper: substitute agency name into proposed text for display
+  const branded = (text: string) => {
+    if (!agencyName.trim()) return text;
+    return text
+      .replace(/\bThe agency\b/g, agencyName)
+      .replace(/\bthe agency\b/g, agencyName)
+      .replace(/\[Agency Name\]/g, agencyName);
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setAgencyLogo(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const generateForm = async (formName: string, section: PolicySection) => {
+    setGeneratingForm(formName);
+    try {
+      const res = await fetch('/api/policies/generate-form', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          formName,
+          sectionTitle: section.title,
+          oar: section.oar,
+          classification,
+          state,
+          agencyName: agencyName || 'Agency Name',
+          agencyTagline,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedForms(prev => ({ ...prev, [formName]: data.html }));
+        setActiveFormModal(formName);
+      } else {
+        setGeneratedForms(prev => ({ ...prev, [formName]: '<p style="color:red;font-family:sans-serif;">Unable to generate form. Please try again.</p>' }));
+      }
+    } catch {
+      setGeneratedForms(prev => ({ ...prev, [formName]: '<p style="color:red;font-family:sans-serif;">Connection error. Please try again.</p>' }));
+    }
+    setGeneratingForm(null);
+  };
+
+  const printForm = (formName: string) => {
+    const html = generatedForms[formName];
+    if (!html) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>${formName}</title><style>@media print{body{margin:20px;}} body{font-family:sans-serif; max-width:720px; margin:30px auto;}</style></head><body>${html}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 500);
+  };
 
   const scanLog_messages = [
     'Connecting to Oregon Health Authority regulatory database...',
@@ -1235,6 +1324,7 @@ export default function Policies() {
     setShowConcernInput(false);
     setConcern('');
     setAiResponse('');
+    setShowFormsPanel(false);
     if (currentIdx < sections.length - 1) setCurrentIdx(i => i + 1);
     else setStep('done');
   };
@@ -1316,8 +1406,80 @@ export default function Policies() {
       {/* LANDING */}
       {step === 'landing' && (
         <div className="max-w-2xl space-y-6">
+
+          {/* Agency Branding */}
+          <div className="card p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Building2 size={18} className="text-blue-600" />
+              <h2 className="font-semibold text-slate-800">Agency Information & Branding</h2>
+            </div>
+            <p className="text-xs text-slate-500">This information appears on your manual cover page, all generated forms, and throughout the document.</p>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="form-label">Agency Name <span className="text-red-500">*</span></label>
+                <input
+                  className="form-input"
+                  placeholder="e.g. Sunrise Home Care, LLC"
+                  value={agencyName}
+                  onChange={e => setAgencyName(e.target.value)}
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="form-label">Tagline / DBA <span className="text-slate-400 font-normal">(optional)</span></label>
+                <input
+                  className="form-input"
+                  placeholder="e.g. Compassionate Care, Every Day"
+                  value={agencyTagline}
+                  onChange={e => setAgencyTagline(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Logo upload */}
+            <div>
+              <label className="form-label">Agency Logo <span className="text-slate-400 font-normal">(optional — appears on manual cover and all forms)</span></label>
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-32 h-16 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors overflow-hidden"
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  {agencyLogo
+                    ? <img src={agencyLogo} alt="Logo" className="max-w-full max-h-full object-contain p-1" />
+                    : <div className="text-center"><Upload size={18} className="text-slate-400 mx-auto mb-1" /><span className="text-xs text-slate-400">Upload Logo</span></div>
+                  }
+                </div>
+                <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                <div className="space-y-1">
+                  <button className="text-xs text-blue-600 hover:text-blue-800 block" onClick={() => logoInputRef.current?.click()}>
+                    {agencyLogo ? 'Change logo' : 'Upload logo'}
+                  </button>
+                  {agencyLogo && (
+                    <button className="text-xs text-red-500 hover:text-red-700 block" onClick={() => setAgencyLogo('')}>Remove</button>
+                  )}
+                  <p className="text-xs text-slate-400">PNG, JPG, SVG — max 2MB</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview chip */}
+            {agencyName && (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-3">
+                {agencyLogo
+                  ? <img src={agencyLogo} alt="" className="h-8 w-auto object-contain" />
+                  : <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-bold">{agencyName.charAt(0)}</div>
+                }
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">{agencyName}</div>
+                  {agencyTagline && <div className="text-xs text-slate-500">{agencyTagline}</div>}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Manual Setup */}
           <div className="card p-6 space-y-5">
-            <h2 className="font-semibold text-slate-800">Generate / Update Your Policy & Procedure Manual</h2>
+            <h2 className="font-semibold text-slate-800">Manual Setup</h2>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="form-label">State / Jurisdiction</label>
                 <select className="form-input" value={state} onChange={e => setState(e.target.value)}>
@@ -1339,18 +1501,32 @@ export default function Policies() {
             </div>
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
               <div className="text-sm font-medium text-slate-700 mb-2">Existing Policy Manual</div>
-              <div className="text-xs text-slate-500 mb-2">CareAxis_PP_Manual_2025.pdf — Last updated Jan 1, 2025</div>
-              <button className="text-xs text-blue-600 hover:text-blue-800">Upload New Document</button>
+              <div className="text-xs text-slate-500 mb-2">Upload an existing manual to scan it for gaps against current regulations.</div>
+              <button className="text-xs text-blue-600 hover:text-blue-800">Upload Existing Document (PDF/DOCX)</button>
             </div>
             <div className="flex gap-3">
-              <button onClick={startScan} className="btn-primary flex-1 flex items-center justify-center gap-2">
+              <button
+                onClick={startScan}
+                disabled={!agencyName.trim()}
+                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Search size={16} /> Scan & Update Existing Manual
               </button>
-              <button onClick={startScan} className="btn-secondary flex-1">Generate Fresh Manual</button>
+              <button
+                onClick={startScan}
+                disabled={!agencyName.trim()}
+                className="btn-secondary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Generate Fresh Manual
+              </button>
             </div>
+            {!agencyName.trim() && (
+              <p className="text-xs text-amber-600 text-center">Enter your agency name above to continue.</p>
+            )}
           </div>
+
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-            <strong>How it works:</strong> The AI scans Oregon OAR 333-536 regulations, cross-references your existing manual, identifies gaps, and walks you through each section one at a time. You can accept as-is or request changes. When complete, a full compliant P&P manual is generated.
+            <strong>How it works:</strong> The AI scans OAR 333-536 regulations for your classification, walks you through all 18 required policy sections, substitutes your agency name throughout, and generates every required compliance form — all branded with your logo and information.
           </div>
         </div>
       )}
@@ -1378,7 +1554,7 @@ export default function Policies() {
         <div className="max-w-3xl space-y-4">
           {/* Progress */}
           <div className="flex items-center gap-4">
-            <button onClick={() => currentIdx > 0 && setCurrentIdx(i => i - 1)} className="btn-secondary p-2" disabled={currentIdx === 0}>
+            <button onClick={() => { if (currentIdx > 0) { setCurrentIdx(i => i - 1); setShowFormsPanel(false); setChat([]); setAiResponse(''); } }} className="btn-secondary p-2" disabled={currentIdx === 0}>
               <ChevronLeft size={16} />
             </button>
             <div className="flex-1">
@@ -1390,7 +1566,7 @@ export default function Policies() {
                 <div className="h-2 bg-blue-500 rounded-full transition-all" style={{ width: `${((currentIdx + 1) / sections.length) * 100}%` }} />
               </div>
             </div>
-            <button onClick={() => currentIdx < sections.length - 1 && setCurrentIdx(i => i + 1)} className="btn-secondary p-2">
+            <button onClick={() => { if (currentIdx < sections.length - 1) { setCurrentIdx(i => i + 1); setShowFormsPanel(false); setChat([]); setAiResponse(''); } }} className="btn-secondary p-2">
               <ChevronRight size={16} />
             </button>
           </div>
@@ -1414,7 +1590,7 @@ export default function Policies() {
             <div>
               <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Proposed Policy Language</div>
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-700 whitespace-pre-wrap font-mono leading-relaxed">
-                {currentSection.proposedText}
+                {branded(currentSection.proposedText)}
               </div>
             </div>
 
@@ -1425,6 +1601,100 @@ export default function Policies() {
               </div>
               <p className="text-sm text-blue-700">{currentSection.explanation}</p>
             </div>
+
+            {/* Referenced Forms Panel */}
+            {currentSection.forms && currentSection.forms.length > 0 && (
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setShowFormsPanel(!showFormsPanel)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-sm font-semibold text-slate-700"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText size={15} className="text-slate-500" />
+                    <span>Referenced Forms ({currentSection.forms.length})</span>
+                    <span className="text-xs font-normal text-slate-400">— generate & print compliance forms for this section</span>
+                  </div>
+                  <ChevronDown size={15} className={`text-slate-400 transition-transform ${showFormsPanel ? 'rotate-180' : ''}`} />
+                </button>
+                {showFormsPanel && (
+                  <div className="divide-y divide-slate-100">
+                    {currentSection.forms.map(formName => (
+                      <div key={formName} className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <FileText size={14} className="text-blue-500 flex-shrink-0" />
+                          <span className="text-sm text-slate-700">{formName}</span>
+                          {generatedForms[formName] && (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Generated</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {generatedForms[formName] && (
+                            <>
+                              <button
+                                onClick={() => setActiveFormModal(formName)}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 hover:bg-blue-50 rounded"
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => printForm(formName)}
+                                className="text-xs text-slate-600 hover:text-slate-800 font-medium px-2 py-1 hover:bg-slate-100 rounded flex items-center gap-1"
+                              >
+                                <Printer size={12} /> Print
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={() => generateForm(formName, currentSection)}
+                            disabled={generatingForm === formName}
+                            className="text-xs btn-primary px-3 py-1.5 flex items-center gap-1 disabled:opacity-60"
+                          >
+                            {generatingForm === formName
+                              ? <><Loader size={12} className="animate-spin" /> Generating...</>
+                              : generatedForms[formName]
+                                ? <><FileText size={12} /> Regenerate</>
+                                : <><FileText size={12} /> Generate</>
+                            }
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Form Modal */}
+            {activeFormModal && generatedForms[activeFormModal] && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{activeFormModal}</h3>
+                      <p className="text-xs text-slate-500">{currentSection.oar} | {classification} Classification</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => printForm(activeFormModal)}
+                        className="btn-secondary flex items-center gap-2 text-sm"
+                      >
+                        <Printer size={14} /> Print Form
+                      </button>
+                      <button
+                        onClick={() => setActiveFormModal(null)}
+                        className="btn-secondary text-sm px-3"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    className="flex-1 overflow-y-auto p-6"
+                    dangerouslySetInnerHTML={{ __html: generatedForms[activeFormModal] }}
+                  />
+                </div>
+              </div>
+            )}
 
             {chat.length > 0 && (
               <div className="border border-slate-200 rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
@@ -1470,33 +1740,126 @@ export default function Policies() {
       {/* DONE */}
       {step === 'done' && (
         <div className="max-w-2xl space-y-4">
-          <div className="card p-6 text-center space-y-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle size={32} className="text-green-600" />
+
+          {/* Manual Cover Page Preview */}
+          <div className="card overflow-hidden">
+            {/* Cover */}
+            <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-8 text-white text-center space-y-4">
+              {agencyLogo
+                ? <img src={agencyLogo} alt="Agency Logo" className="h-16 w-auto object-contain mx-auto drop-shadow-lg" />
+                : <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto text-3xl font-bold">{(agencyName || 'A').charAt(0)}</div>
+              }
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">{agencyName || 'Your Agency'}</h1>
+                {agencyTagline && <p className="text-slate-300 text-sm mt-1">{agencyTagline}</p>}
+              </div>
+              <div className="border-t border-white/20 pt-4">
+                <h2 className="text-lg font-semibold text-white/90">Policy & Procedure Manual</h2>
+                <p className="text-slate-300 text-sm mt-1">{classification} Classification · {state === 'OR' ? 'Oregon (OAR 333-536)' : state}</p>
+                <p className="text-slate-400 text-xs mt-1">Effective: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-slate-900">Policy & Procedure Manual Complete</h2>
-            <p className="text-slate-500 text-sm">{sections.filter(s => s.accepted).length} sections accepted · OAR 333-536 compliant · {classification} classification</p>
-            <div className="flex gap-3 justify-center">
-              <button className="btn-primary flex items-center gap-2"><Download size={16} /> Download Manual (PDF)</button>
-              <button className="btn-secondary flex items-center gap-2"><Download size={16} /> Download (.docx)</button>
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-center gap-2 text-green-600">
+                <CheckCircle size={18} />
+                <span className="text-sm font-medium">{sections.filter(s => s.accepted).length} of {sections.length} sections accepted · OAR 333-536 compliant</span>
+              </div>
+              <div className="flex gap-3">
+                <button className="btn-primary flex-1 flex items-center justify-center gap-2"><Download size={16} /> Download Manual (PDF)</button>
+                <button className="btn-secondary flex-1 flex items-center justify-center gap-2"><Download size={16} /> Download (.docx)</button>
+              </div>
+              <button onClick={() => { setStep('landing'); setCurrentIdx(0); setSections([]); setChat([]); setGeneratedForms({}); setFollowUpAnswer(''); setFollowUpQuestion(''); }} className="text-sm text-blue-600 hover:text-blue-800 block text-center w-full">
+                Start New / Update Again
+              </button>
             </div>
-            <button onClick={() => { setStep('landing'); setCurrentIdx(0); setSections([]); setChat([]); }} className="text-sm text-blue-600 hover:text-blue-800">
-              Start New / Update Again
-            </button>
           </div>
 
+          {/* Forms Library */}
+          <div className="card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText size={16} className="text-blue-600" />
+              <h3 className="font-semibold text-slate-800">Compliance Forms Library</h3>
+              <span className="text-xs text-slate-400 ml-auto">
+                {Object.keys(generatedForms).length} of {sections.reduce((sum, s) => sum + (s.forms?.length || 0), 0)} forms generated
+              </span>
+            </div>
+            <div className="space-y-2">
+              {sections.map(section => (
+                section.forms && section.forms.length > 0 ? (
+                  <div key={section.id}>
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-3 mb-1.5">{section.title}</div>
+                    {section.forms.map(formName => (
+                      <div key={formName} className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText size={13} className={generatedForms[formName] ? 'text-green-500' : 'text-slate-400'} />
+                          <span className="text-sm text-slate-700 truncate">{formName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {generatedForms[formName] ? (
+                            <>
+                              <button onClick={() => setActiveFormModal(formName)} className="text-xs text-blue-600 hover:text-blue-800 font-medium">View</button>
+                              <button onClick={() => printForm(formName)} className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                                <Printer size={11} /> Print
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => generateForm(formName, sections.find(s => s.forms?.includes(formName))!)}
+                              disabled={generatingForm === formName}
+                              className="text-xs btn-primary px-2.5 py-1 flex items-center gap-1 disabled:opacity-60"
+                            >
+                              {generatingForm === formName ? <><Loader size={11} className="animate-spin" /> Generating...</> : 'Generate'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null
+              ))}
+            </div>
+          </div>
+
+          {/* Form Modal (also available on done step) */}
+          {activeFormModal && generatedForms[activeFormModal] && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">{activeFormModal}</h3>
+                    <p className="text-xs text-slate-500">{agencyName} · {classification} Classification</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => printForm(activeFormModal)} className="btn-secondary flex items-center gap-2 text-sm"><Printer size={14} /> Print Form</button>
+                    <button onClick={() => setActiveFormModal(null)} className="btn-secondary text-sm px-3">Close</button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6" dangerouslySetInnerHTML={{ __html: generatedForms[activeFormModal] }} />
+              </div>
+            </div>
+          )}
+
+          {/* Next Steps */}
           <div className="card p-5">
             <h3 className="font-semibold text-slate-800 mb-3">Next Steps</h3>
             <div className="space-y-2">
-              {['Have all staff review the updated manual', 'Administrator signs the certification page', 'Upload signed manual to Document Management', 'Schedule staff training on any new or changed policies', 'Set reminder for annual review (12 months from today)'].map((step, i) => (
+              {[
+                'Have all staff review the updated manual',
+                'Administrator signs the certification page',
+                'Upload signed manual to Document Management',
+                `Generate and print all ${sections.reduce((sum, s) => sum + (s.forms?.length || 0), 0)} referenced compliance forms`,
+                'Schedule staff training on any new or changed policies',
+                'Set reminder for annual review (12 months from today)',
+              ].map((item, i) => (
                 <label key={i} className="flex items-center gap-3 text-sm cursor-pointer hover:bg-slate-50 p-2 rounded">
                   <input type="checkbox" className="w-4 h-4 accent-blue-600" />
-                  <span>{step}</span>
+                  <span>{item}</span>
                 </label>
               ))}
             </div>
           </div>
 
+          {/* Follow-Up Question */}
           <div className="card p-5">
             <h3 className="font-semibold text-slate-800 mb-3">Ask a Follow-Up Question</h3>
             <div className="flex gap-2">
@@ -1517,8 +1880,10 @@ export default function Policies() {
               </div>
             )}
           </div>
+
         </div>
       )}
+
     </div>
   );
 }

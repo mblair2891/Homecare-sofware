@@ -194,4 +194,78 @@ Provide a structured gap analysis listing each required policy area and its curr
   }
 });
 
+// POST /api/policies/generate-form
+// Generates a regulation-compliant printable form with agency branding
+router.post('/generate-form', async (req: Request, res: Response) => {
+  try {
+    const { formName, sectionTitle, oar, classification, state, agencyName, agencyTagline } = req.body;
+
+    if (!formName || !oar) {
+      return res.status(400).json({ error: 'formName and oar are required' });
+    }
+
+    const brandName = agencyName || '[AGENCY NAME]';
+    const brandTagline = agencyTagline ? `\n${agencyTagline}` : '';
+
+    const message = await getClient().messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      messages: [
+        {
+          role: 'user',
+          content: `You are creating a professional, printable compliance form for a ${state || 'Oregon'} in-home care agency.
+
+Agency: ${brandName}${brandTagline}
+Form Name: ${formName}
+Related Policy Section: ${sectionTitle}
+Regulatory Reference: ${oar}
+Agency Classification: ${classification || 'Basic'}
+
+Generate the form as an HTML document body (no <html>/<head>/<body> tags). Use ONLY inline styles.
+
+REQUIRED STRUCTURE:
+1. HEADER (centered):
+   - Agency logo placeholder: <div style="border:2px solid #ccc; width:120px; height:60px; margin:0 auto 8px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#999; font-family:sans-serif;">AGENCY LOGO</div>
+   - Agency name: <h2 style="margin:0; font-family:sans-serif; font-size:18px; color:#1e3a5f;">${brandName}</h2>
+   - Form title: <h1 style="margin:6px 0 2px; font-family:sans-serif; font-size:15px;">${formName}</h1>
+   - Reference: <p style="margin:0 0 8px; font-size:11px; color:#555; font-family:sans-serif;">${oar} | ${classification || 'Basic'} Classification</p>
+   - Horizontal rule
+
+2. INSTRUCTIONS (small, italic, left-aligned):
+   "Complete all fields. Print legibly. Retain in [appropriate record] for minimum [X] years per OAR requirements."
+
+3. FORM FIELDS — use a clean table layout:
+   - Each field: label (bold, left column ~35%), blank line input area (right column ~65%)
+   - Use <table style="width:100%; border-collapse:collapse; margin-top:12px;"> with <tr> rows
+   - Each cell: <td style="padding:6px 4px; font-family:sans-serif; font-size:12px;">
+   - Input area: <td style="border-bottom:1px solid #333; padding:6px 4px; font-family:sans-serif; font-size:12px; min-width:200px;">&nbsp;</td>
+   - Section headers (e.g., "CAREGIVER INFORMATION"): full-width row with bold text, light gray background
+   - Checkboxes for yes/no or checklist items: ☐ label text
+
+4. REQUIRED FIELDS — include EVERY field that ${oar} mandates for documenting "${formName}". Be comprehensive and specific to the regulation.
+
+5. SIGNATURE BLOCK at bottom (separate table):
+   - Signature line | Printed Name | Title | Date
+   - Multiple signature rows if regulation requires multiple parties to sign
+
+6. FOOTER:
+   <p style="font-size:10px; color:#666; font-family:sans-serif; text-align:center; margin-top:20px; border-top:1px solid #ddd; padding-top:8px;">
+   ${brandName} | ${formName} | Version 1.0 | ${oar} | Retain per agency record retention policy
+   </p>
+
+Make the form comprehensive and professional. All fields must satisfy the specific documentation requirements in ${oar} for this form type.
+
+Return ONLY the HTML markup. No explanation text, no code fences.`
+        }
+      ]
+    });
+
+    const html = message.content[0].type === 'text' ? message.content[0].text : '';
+    res.json({ html, tokensUsed: message.usage.input_tokens + message.usage.output_tokens });
+  } catch (err) {
+    console.error('Form generation error:', err);
+    res.status(500).json({ error: 'Failed to generate form' });
+  }
+});
+
 export default router;
