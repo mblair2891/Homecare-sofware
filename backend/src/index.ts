@@ -12,6 +12,7 @@ import policiesRouter from './routes/policies';
 import authRouter from './routes/auth';
 import adminRouter from './routes/admin';
 import formsRouter from './routes/forms';
+import usersRouter from './routes/users';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use('/api/billing', billingRouter);
 app.use('/api/compliance', complianceRouter);
 app.use('/api/policies', policiesRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/users', usersRouter);
 app.use('/api/forms', formsRouter);
 
 // Health check

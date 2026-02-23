@@ -438,7 +438,7 @@ export default function AddAgencyModal({ onClose, onSave }: Props) {
 
               {!form.licenseNumber && (
                 <p className="text-xs text-slate-400 italic">
-                  For Oregon: Try <button className="text-blue-500 underline" onClick={() => set({ licenseNumber: 'IHC-2021-001' })}>IHC-2021-001</button> (Active), <button className="text-blue-500 underline" onClick={() => set({ licenseNumber: 'IHC-2020-015' })}>IHC-2020-015</button> (Expired), or <button className="text-blue-500 underline" onClick={() => set({ licenseNumber: 'IHC-2024-008' })}>IHC-2024-008</button> (Suspended).
+                  For Oregon agencies, enter the license number in the format IHC-YYYY-NNN (e.g. IHC-2024-001).
                 </p>
               )}
             </div>
