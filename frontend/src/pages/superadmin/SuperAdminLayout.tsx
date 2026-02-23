@@ -10,7 +10,7 @@ import {
 type AdminSection = 'agencies' | 'analytics' | 'settings';
 
 const navItems: { id: AdminSection; label: string; icon: React.ElementType }[] = [
-  { id: 'agencies', label: 'Agencies', icon: Building2 },
+  { id: 'agencies', label: 'Companies', icon: Building2 },
   { id: 'analytics', label: 'Platform Analytics', icon: BarChart3 },
   { id: 'settings', label: 'Platform Settings', icon: Settings },
 ];

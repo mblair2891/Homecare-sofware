@@ -11,6 +11,8 @@ export type Classification = 'Limited' | 'Basic' | 'Intermediate' | 'Comprehensi
 export type AgencyPlan = 'Trial' | 'Starter' | 'Professional' | 'Enterprise';
 
 export interface NewAgencyData {
+  // Company
+  companyName: string;
   // License
   state: string;
   licenseNumber: string;
@@ -66,6 +68,7 @@ export interface NewAgencyData {
 }
 
 const EMPTY_FORM: NewAgencyData = {
+  companyName: '',
   state: 'OR', licenseNumber: '', licenseStatus: '', licenseExpiry: '',
   licenseIssuedDate: '', licenseVerified: false,
   legalName: '', dbaName: '', classification: 'Basic', taxId: '', npiNumber: '',
@@ -270,7 +273,7 @@ export default function AddAgencyModal({ onClose, onSave }: Props) {
   // ── Step validation (minimal — just required fields) ──────────────────────
   const canProceed = () => {
     if (step === 1) return form.licenseNumber.trim() !== '';
-    if (step === 2) return form.legalName.trim() !== '' && form.agencyPhone.trim() !== '' && form.agencyEmail.trim() !== '';
+    if (step === 2) return form.companyName.trim() !== '' && form.legalName.trim() !== '' && form.agencyPhone.trim() !== '' && form.agencyEmail.trim() !== '';
     if (step === 3) return form.adminName.trim() !== '' && form.adminEmail.trim() !== '';
     return true;
   };
@@ -291,7 +294,7 @@ export default function AddAgencyModal({ onClose, onSave }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
           <div>
-            <h2 className="text-lg font-semibold text-slate-800">Onboard New Agency</h2>
+            <h2 className="text-lg font-semibold text-slate-800">Onboard New Company</h2>
             <p className="text-xs text-slate-400 mt-0.5">Step {step} of {STEPS.length} — {STEPS[step - 1].label}</p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
@@ -445,8 +448,28 @@ export default function AddAgencyModal({ onClose, onSave }: Props) {
           {step === 2 && (
             <div className="space-y-5">
               <div>
-                <h3 className="text-sm font-semibold text-slate-700 mb-0.5">Agency Profile</h3>
-                <p className="text-xs text-slate-400">Legal information, address, and contact details for the agency.</p>
+                <h3 className="text-sm font-semibold text-slate-700 mb-0.5">Company & Agency Profile</h3>
+                <p className="text-xs text-slate-400">Enter the parent company name, then the licensed agency details. For single-agency companies these can be the same.</p>
+              </div>
+
+              {/* Company name */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-0.5">Parent Company</p>
+                  <p className="text-xs text-blue-600">The organization that owns and operates the agency. Can match the agency name for single-agency companies.</p>
+                </div>
+                <Field label="Company / Organization Name" required>
+                  <Input
+                    value={form.companyName}
+                    onChange={(e) => set({ companyName: e.target.value })}
+                    placeholder="Pacific Northwest Care Network"
+                    className="bg-white"
+                  />
+                </Field>
+              </div>
+
+              <div className="pt-1">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Licensed Agency</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -771,6 +794,7 @@ export default function AddAgencyModal({ onClose, onSave }: Props) {
               <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Agency Summary</p>
                 <div className="grid grid-cols-2 gap-y-2 text-sm">
+                  <span className="text-slate-500">Company:</span><span className="font-medium text-slate-700">{form.companyName || '—'}</span>
                   <span className="text-slate-500">Agency:</span><span className="font-medium text-slate-700">{form.legalName || '—'}</span>
                   <span className="text-slate-500">License:</span><span className="font-medium text-slate-700">{form.licenseNumber || '—'} {form.licenseVerified && <span className="text-green-600 text-xs">✓ Verified</span>}</span>
                   <span className="text-slate-500">Classification:</span><span className="font-medium text-slate-700">{form.classification}</span>
