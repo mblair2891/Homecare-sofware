@@ -2,10 +2,12 @@ import { Router, Response } from 'express';
 import { differenceInDays } from 'date-fns';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, authenticate } from '../middleware/auth';
+import { authorize } from '../middleware/rbac';
 
 const router = Router();
 
-// GET /api/compliance/dashboard
+// ─── GET /api/compliance/dashboard ───────────────────────────────────────────
+// All authenticated roles can view the compliance dashboard
 router.get('/dashboard', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const agencyId = req.user!.agencyId;
@@ -19,7 +21,7 @@ router.get('/dashboard', authenticate, async (req: AuthRequest, res: Response) =
 
     const alerts: { type: string; entity: string; entityId: string; message: string; severity: 'critical' | 'warning' | 'info' }[] = [];
 
-    // Check agency/location license expiry
+    // Agency / location license expiry
     if (agency?.licenseExpiry) {
       const daysUntil = differenceInDays(agency.licenseExpiry, now);
       if (daysUntil < 0) alerts.push({ type: 'license', entity: 'Agency', entityId: agency.id, message: `Agency license expired ${Math.abs(daysUntil)} days ago`, severity: 'critical' });
@@ -75,7 +77,7 @@ router.get('/dashboard', authenticate, async (req: AuthRequest, res: Response) =
 
     res.json({
       overallScore,
-      alerts: alerts.slice(0, 50), // Cap at 50 for performance
+      alerts: alerts.slice(0, 50),
       summary: {
         totalClients: clients.length,
         compliantClients: clientCompliant,
@@ -83,7 +85,9 @@ router.get('/dashboard', authenticate, async (req: AuthRequest, res: Response) =
         compliantCaregivers: caregiverCompliant,
       },
       licenseStatus: {
-        agencyLicense: agency?.licenseExpiry ? { expiry: agency.licenseExpiry, daysRemaining: differenceInDays(agency.licenseExpiry, now) } : null,
+        agencyLicense: agency?.licenseExpiry
+          ? { expiry: agency.licenseExpiry, daysRemaining: differenceInDays(agency.licenseExpiry, now) }
+          : null,
       },
     });
   } catch (err) {
@@ -92,12 +96,10 @@ router.get('/dashboard', authenticate, async (req: AuthRequest, res: Response) =
   }
 });
 
-// GET /api/compliance/clients/:id/alerts
+// ─── GET /api/compliance/clients/:id/alerts ───────────────────────────────────
 router.get('/clients/:id/alerts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const client = await prisma.client.findFirst({
-      where: { id: req.params.id, agencyId: req.user!.agencyId },
-    });
+    const client = await prisma.client.findFirst({ where: { id: req.params.id, agencyId: req.user!.agencyId } });
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
     const now = new Date();
@@ -119,12 +121,10 @@ router.get('/clients/:id/alerts', authenticate, async (req: AuthRequest, res: Re
   }
 });
 
-// GET /api/compliance/caregivers/:id/alerts
+// ─── GET /api/compliance/caregivers/:id/alerts ────────────────────────────────
 router.get('/caregivers/:id/alerts', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const caregiver = await prisma.caregiver.findFirst({
-      where: { id: req.params.id, agencyId: req.user!.agencyId },
-    });
+    const caregiver = await prisma.caregiver.findFirst({ where: { id: req.params.id, agencyId: req.user!.agencyId } });
     if (!caregiver) return res.status(404).json({ error: 'Caregiver not found' });
 
     const now = new Date();
@@ -148,8 +148,23 @@ router.get('/caregivers/:id/alerts', authenticate, async (req: AuthRequest, res:
   }
 });
 
-// POST /api/compliance/qa-meeting
-router.post('/qa-meeting', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── GET /api/compliance/qa-meetings ─────────────────────────────────────────
+router.get('/qa-meetings', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const records = await prisma.qARecord.findMany({
+      where: { agencyId: req.user!.agencyId },
+      orderBy: { meetingDate: 'desc' },
+    });
+    res.json({ records });
+  } catch (err) {
+    console.error('QA meetings error:', err);
+    res.status(500).json({ error: 'Failed to fetch QA meetings' });
+  }
+});
+
+// ─── POST /api/compliance/qa-meeting ─────────────────────────────────────────
+// Owner and Administrator only — QA meetings are administrative records
+router.post('/qa-meeting', authenticate, authorize('Owner', 'Administrator'), async (req: AuthRequest, res: Response) => {
   try {
     const { date, attendees, adverseEventsReviewed, qualityIndicators, preventiveStrategies, nextMeetingDate } = req.body;
     if (!date) return res.status(400).json({ error: 'Meeting date is required' });
@@ -173,8 +188,23 @@ router.post('/qa-meeting', authenticate, async (req: AuthRequest, res: Response)
   }
 });
 
-// POST /api/compliance/incident
-router.post('/incident', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── GET /api/compliance/incidents ───────────────────────────────────────────
+router.get('/incidents', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse'), async (req: AuthRequest, res: Response) => {
+  try {
+    const incidents = await prisma.incidentReport.findMany({
+      where: { agencyId: req.user!.agencyId },
+      orderBy: { incidentDate: 'desc' },
+    });
+    res.json({ incidents });
+  } catch (err) {
+    console.error('Fetch incidents error:', err);
+    res.status(500).json({ error: 'Failed to fetch incidents' });
+  }
+});
+
+// ─── POST /api/compliance/incident ───────────────────────────────────────────
+// Owner, Administrator, Coordinator, Nurse — clinical staff can log incidents
+router.post('/incident', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse'), async (req: AuthRequest, res: Response) => {
   try {
     const { clientId, caregiverId, incidentDate, type, severity, description, immediateAction, reportedToODHS, reportedToOHA, reportedToLE } = req.body;
     if (!clientId || !incidentDate || !type || !severity || !description) {
@@ -201,6 +231,25 @@ router.post('/incident', authenticate, async (req: AuthRequest, res: Response) =
   } catch (err) {
     console.error('Incident error:', err);
     res.status(500).json({ error: 'Failed to log incident' });
+  }
+});
+
+// ─── PATCH /api/compliance/incidents/:id ─────────────────────────────────────
+// Resolve / update an incident — Owner and Administrator only
+router.patch('/incidents/:id', authenticate, authorize('Owner', 'Administrator'), async (req: AuthRequest, res: Response) => {
+  try {
+    const existing = await prisma.incidentReport.findFirst({ where: { id: req.params.id, agencyId: req.user!.agencyId } });
+    if (!existing) return res.status(404).json({ error: 'Incident not found' });
+
+    const { status, resolution } = req.body;
+    const incident = await prisma.incidentReport.update({
+      where: { id: req.params.id },
+      data: { ...(status ? { status } : {}), ...(resolution ? { resolution } : {}) },
+    });
+    res.json(incident);
+  } catch (err) {
+    console.error('Update incident error:', err);
+    res.status(500).json({ error: 'Failed to update incident' });
   }
 });
 

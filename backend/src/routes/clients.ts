@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, authenticate } from '../middleware/auth';
+import { authorize, agencyScope, locationFilter } from '../middleware/rbac';
 import { PayerType, AgencyClassification } from '@prisma/client';
 
 const router = Router();
@@ -60,13 +61,16 @@ function parseOptionalDate(val?: string): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
-// GET /api/clients
+// ─── GET /api/clients ─────────────────────────────────────────────────────────
+// All authenticated roles can list clients; location-scoped users see only their location.
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { status, locationId, search } = req.query;
-    const where: any = { agencyId: req.user!.agencyId };
+    const where: any = agencyScope(req);
+
     if (status && status !== 'all') where.status = status;
-    if (locationId) where.locationId = locationId as string;
+    // Only allow an explicit locationId filter for admin roles (agencyScope already enforces for others)
+    if (locationId && !locationFilter(req)) where.locationId = locationId as string;
     if (search) where.name = { contains: search as string, mode: 'insensitive' };
 
     const clients = await prisma.client.findMany({
@@ -85,11 +89,15 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/clients/:id
+// ─── GET /api/clients/:id ─────────────────────────────────────────────────────
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    const where: any = { id: req.params.id, agencyId: req.user!.agencyId };
+    const locId = locationFilter(req);
+    if (locId) where.locationId = locId;
+
     const client = await prisma.client.findFirst({
-      where: { id: req.params.id, agencyId: req.user!.agencyId },
+      where,
       include: {
         location: { select: { id: true, name: true } },
         clientCaregivers: { include: { caregiver: { select: { id: true, name: true, phone: true } } } },
@@ -107,8 +115,9 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/clients
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── POST /api/clients ────────────────────────────────────────────────────────
+// Owner, Administrator, Coordinator, Nurse can create clients
+router.post('/', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse'), async (req: AuthRequest, res: Response) => {
   try {
     const data = ClientSchema.parse(req.body);
     const payer = PAYER_MAP[data.payer];
@@ -159,11 +168,11 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// PATCH /api/clients/:id
-router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── PATCH /api/clients/:id ───────────────────────────────────────────────────
+// Owner, Administrator, Coordinator, Nurse can update clients
+router.patch('/:id', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse'), async (req: AuthRequest, res: Response) => {
   try {
     const data = ClientSchema.partial().parse(req.body);
-
     const existing = await prisma.client.findFirst({ where: { id: req.params.id, agencyId: req.user!.agencyId } });
     if (!existing) return res.status(404).json({ error: 'Client not found' });
 
@@ -200,8 +209,9 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// DELETE /api/clients/:id (soft delete — sets status to Discharged)
-router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── DELETE /api/clients/:id ──────────────────────────────────────────────────
+// Soft delete — Owner and Administrator only
+router.delete('/:id', authenticate, authorize('Owner', 'Administrator'), async (req: AuthRequest, res: Response) => {
   try {
     const existing = await prisma.client.findFirst({ where: { id: req.params.id, agencyId: req.user!.agencyId } });
     if (!existing) return res.status(404).json({ error: 'Client not found' });
@@ -217,7 +227,8 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/clients/:id/compliance
+// ─── GET /api/clients/:id/compliance ─────────────────────────────────────────
+// All authenticated roles can view compliance status
 router.get('/:id/compliance', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const client = await prisma.client.findFirst({

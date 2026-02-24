@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string;
   role: string;
   agencyId: string;
+  locationId?: string;
 }
 
 export interface AuthRequest extends Request {

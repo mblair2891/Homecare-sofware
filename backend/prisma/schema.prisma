@@ -88,6 +88,7 @@ model Agency {
   policyManuals      PolicyManual[]
   qaRecords          QARecord[]
   incidentReports    IncidentReport[]
+  invoices           Invoice[]
 }
 
 // ============ LOCATION ============
@@ -171,6 +172,8 @@ model Client {
   formRecords              FormRecord[]
   clientCaregivers         ClientCaregiver[]
   monitoringVisits         MonitoringVisit[]
+  invoices                 Invoice[]
+  recurringSchedules       RecurringSchedule[]
 }
 
 // ============ CAREGIVER ============
@@ -208,6 +211,8 @@ model Caregiver {
   location                 Location?        @relation(fields: [locationId], references: [id])
   shifts                   Shift[]
   clientCaregivers         ClientCaregiver[]
+  availability             CaregiverAvailability[]
+  recurringSchedules       RecurringSchedule[]
 }
 
 // ============ CLIENT-CAREGIVER ASSIGNMENT ============
@@ -223,28 +228,65 @@ model ClientCaregiver {
 }
 
 // ============ SHIFT / EVV ============
+// caregiverId is nullable to support open (unassigned) shifts
 model Shift {
-  id           String      @id @default(cuid())
-  clientId     String
-  caregiverId  String
-  date         DateTime
-  startTime    String
-  endTime      String
-  status       ShiftStatus @default(Scheduled)
-  evvClockIn   DateTime?
-  evvClockOut  DateTime?
-  evvMethod    String?
-  evvVerified  Boolean     @default(false)
-  evvLatIn     Float?
-  evvLngIn     Float?
-  evvLatOut    Float?
-  evvLngOut    Float?
-  tasks        String[]
-  visitNotes   String?
-  location     String
-  createdAt    DateTime    @default(now())
-  client       Client      @relation(fields: [clientId], references: [id])
-  caregiver    Caregiver   @relation(fields: [caregiverId], references: [id])
+  id                  String      @id @default(cuid())
+  clientId            String
+  caregiverId         String?     // null = open shift, awaiting assignment
+  date                DateTime
+  startTime           String      // HH:MM
+  endTime             String      // HH:MM
+  status              ShiftStatus @default(Scheduled)
+  evvClockIn          DateTime?
+  evvClockOut         DateTime?
+  evvMethod           String?
+  evvVerified         Boolean     @default(false)
+  evvLatIn            Float?
+  evvLngIn            Float?
+  evvLatOut           Float?
+  evvLngOut           Float?
+  tasks               String[]
+  visitNotes          String?
+  location            String
+  recurringScheduleId String?     // set when generated from a recurring schedule
+  createdAt           DateTime    @default(now())
+  client              Client      @relation(fields: [clientId], references: [id])
+  caregiver           Caregiver?  @relation(fields: [caregiverId], references: [id])
+  recurringSchedule   RecurringSchedule? @relation(fields: [recurringScheduleId], references: [id])
+}
+
+// ============ RECURRING SCHEDULE ============
+model RecurringSchedule {
+  id          String    @id @default(cuid())
+  agencyId    String
+  clientId    String
+  caregiverId String?
+  frequency   String    // weekly, biweekly
+  daysOfWeek  Int[]     // 0=Sun … 6=Sat
+  startTime   String    // HH:MM
+  endTime     String    // HH:MM
+  startDate   DateTime
+  endDate     DateTime?
+  tasks       String[]
+  location    String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  client      Client    @relation(fields: [clientId], references: [id])
+  caregiver   Caregiver? @relation(fields: [caregiverId], references: [id])
+  shifts      Shift[]
+}
+
+// ============ CAREGIVER AVAILABILITY ============
+// One record per caregiver per day-of-week (replace to update)
+model CaregiverAvailability {
+  id          String    @id @default(cuid())
+  caregiverId String
+  dayOfWeek   Int       // 0=Sun … 6=Sat
+  startTime   String    // HH:MM — earliest available
+  endTime     String    // HH:MM — latest available
+  isAvailable Boolean   @default(true)
+  caregiver   Caregiver @relation(fields: [caregiverId], references: [id])
+  @@unique([caregiverId, dayOfWeek])
 }
 
 // ============ INVOICE ============
@@ -264,6 +306,22 @@ model Invoice {
   notes        String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  agency       Agency        @relation(fields: [agencyId], references: [id])
+  client       Client        @relation(fields: [clientId], references: [id])
+  payments     Payment[]
+}
+
+// ============ PAYMENT ============
+model Payment {
+  id              String    @id @default(cuid())
+  invoiceId       String
+  amount          Float
+  method          String    // check, ach, credit_card, medicaid_eft, manual
+  referenceNumber String?
+  notes           String    @default("")
+  status          String    @default("completed") // completed, pending, failed, refunded
+  processedAt     DateTime  @default(now())
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id])
 }
 
 // ============ FORM RECORDS ============
@@ -298,16 +356,16 @@ model MonitoringVisit {
 
 // ============ QA RECORD ============
 model QARecord {
-  id                String    @id @default(cuid())
-  agencyId          String
-  meetingDate       DateTime
-  attendees         Json      // [{name, title}]
-  adverseEvents     String?
-  qualityIndicators String?
+  id                   String    @id @default(cuid())
+  agencyId             String
+  meetingDate          DateTime
+  attendees            Json      // [{name, title}]
+  adverseEvents        String?
+  qualityIndicators    String?
   preventiveStrategies String?
-  nextMeetingDate   DateTime?
-  createdAt         DateTime  @default(now())
-  agency            Agency    @relation(fields: [agencyId], references: [id])
+  nextMeetingDate      DateTime?
+  createdAt            DateTime  @default(now())
+  agency               Agency    @relation(fields: [agencyId], references: [id])
 }
 
 // ============ INCIDENT REPORT ============
@@ -332,16 +390,16 @@ model IncidentReport {
 
 // ============ POLICY MANUAL ============
 model PolicyManual {
-  id             String    @id @default(cuid())
+  id             String               @id @default(cuid())
   agencyId       String
   version        String
-  state          String    @default("OR")
+  state          String               @default("OR")
   classification AgencyClassification
-  content        String    // Full manual text
-  sections       Json      // Array of accepted sections
-  createdAt      DateTime  @default(now())
+  content        String               // Full manual text
+  sections       Json                 // Array of accepted sections
+  createdAt      DateTime             @default(now())
   createdBy      String
-  agency         Agency    @relation(fields: [agencyId], references: [id])
+  agency         Agency               @relation(fields: [agencyId], references: [id])
 }
 
 // ============ AUDIT LOG ============
