@@ -162,7 +162,7 @@ export default function SettingsModule() {
   const agencyId = impersonatingAgency?.id || currentUser?.agencyId;
   const agencyUsers = managedUsers.filter((u) => {
     if (u.role === 'SuperAdmin') return false;
-    if (!agencyId) return u.role !== 'SuperAdmin';
+    if (!agencyId) return true;
     return u.agencyId === agencyId;
   });
 
