@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { api } from '../../lib/api';
 import { Search, ChevronRight, ChevronLeft, CheckCircle, MessageSquare, Download, Loader, FileText, Printer, ChevronDown, Building2, Upload } from 'lucide-react';
 
 type PPStep = 'landing' | 'scanning' | 'review' | 'done';
@@ -1248,18 +1249,14 @@ export default function Policies() {
   const generateForm = async (formName: string, section: PolicySection) => {
     setGeneratingForm(formName);
     try {
-      const res = await fetch('/api/policies/generate-form', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          formName,
-          sectionTitle: section.title,
-          oar: section.oar,
-          classification,
-          state,
-          agencyName: agencyName || 'Agency Name',
-          agencyTagline,
-        }),
+      const res = await api.post('/api/policies/generate-form', {
+        formName,
+        sectionTitle: section.title,
+        oar: section.oar,
+        classification,
+        state,
+        agencyName: agencyName || 'Agency Name',
+        agencyTagline,
       });
       if (res.ok) {
         const data = await res.json();
@@ -1335,17 +1332,13 @@ export default function Policies() {
     const section = sections[currentIdx];
     let response = '';
     try {
-      const res = await fetch('/api/policies/generate-section', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sectionTitle: section.title,
-          oar: section.oar,
-          currentText: section.proposedText,
-          concern: concern.trim(),
-          classification,
-          state,
-        }),
+      const res = await api.post('/api/policies/generate-section', {
+        sectionTitle: section.title,
+        oar: section.oar,
+        currentText: section.proposedText,
+        concern: concern.trim(),
+        classification,
+        state,
       });
       if (res.ok) {
         const data = await res.json();
@@ -1367,14 +1360,10 @@ export default function Policies() {
     setFollowUpLoading(true);
     setFollowUpAnswer('');
     try {
-      const res = await fetch('/api/policies/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: followUpQuestion.trim(),
-          classification,
-          state,
-        }),
+      const res = await api.post('/api/policies/chat', {
+        question: followUpQuestion.trim(),
+        classification,
+        state,
       });
       if (res.ok) {
         const data = await res.json();

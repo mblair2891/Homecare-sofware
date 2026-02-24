@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore, type UserRole, type ManagedUser } from '../../store/useAuthStore';
 import type { Company } from '../../store/usePlatformStore';
+import { api } from '../../lib/api';
 
 type ManageTab = 'overview' | 'users';
 
@@ -38,11 +39,7 @@ function InlineAddUser({ company, onUserCreated, onCancel }: {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name.trim(), email: form.email.trim().toLowerCase(), role: form.role, location: 'All', agencyId, agencyName }),
-      });
+      const res = await api.post('/api/users', { name: form.name.trim(), email: form.email.trim().toLowerCase(), role: form.role, location: 'All', agencyId, agencyName });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create user');
 

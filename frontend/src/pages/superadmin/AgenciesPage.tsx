@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuthStore, type ManagedUser } from '../../store/useAuthStore';
+import { api } from '../../lib/api';
 import { usePlatformStore, MRR_BY_PLAN, type Company, type CompanyStatus } from '../../store/usePlatformStore';
 import type { NewAgencyData } from './AddAgencyModal';
 import {
@@ -97,11 +98,7 @@ export default function CompaniesPage() {
     // Auto-create admin user for the new agency and send welcome email
     if (data.adminName && adminEmail) {
       try {
-        const res = await fetch('/api/users/agency-admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminName: data.adminName, adminEmail: adminEmail, agencyName, companyName, agencyId }),
-        });
+        const res = await api.post('/api/users/agency-admin', { adminName: data.adminName, adminEmail: adminEmail, agencyName, companyName, agencyId });
         const result = await res.json();
         if (res.ok && result.tempPassword) {
           const adminUser: ManagedUser = {

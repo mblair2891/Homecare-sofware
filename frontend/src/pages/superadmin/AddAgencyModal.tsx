@@ -4,6 +4,7 @@ import {
   CheckCircle, AlertTriangle, Loader, ChevronRight, ChevronLeft,
   CheckSquare, Square,
 } from 'lucide-react';
+import { api } from '../../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -221,11 +222,7 @@ export default function AddAgencyModal({ onClose, onSave }: Props) {
     setVerifyMessage('');
 
     try {
-      const res = await fetch('/api/admin/verify-license', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseNumber: form.licenseNumber.trim(), state: form.state }),
-      });
+      const res = await api.post('/api/admin/verify-license', { licenseNumber: form.licenseNumber.trim(), state: form.state });
 
       const data = await res.json();
 
