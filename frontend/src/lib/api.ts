@@ -33,10 +33,14 @@ async function request(method: string, path: string, body?: unknown): Promise<Re
   });
 
   // Guard against HTML responses (e.g. the static server returning index.html
-  // for unknown routes), which would cause a misleading JSON-parse error.
+  // for unknown routes, or Vite proxy returning 502 when backend is down).
   const contentType = res.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json') && !res.ok) {
-    throw new Error(`Server returned ${res.status} (${res.statusText}). Check that VITE_API_URL points to the backend.`);
+  if (!contentType.includes('application/json')) {
+    throw new Error(
+      res.ok
+        ? 'Server returned a non-JSON response. Check that VITE_API_URL points to the backend.'
+        : `Server returned ${res.status} (${res.statusText}). The API may be unreachable.`
+    );
   }
 
   return res;

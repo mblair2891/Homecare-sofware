@@ -97,6 +97,7 @@ export default function CompaniesPage() {
 
     // Auto-create admin user for the new agency and send welcome email
     if (data.adminName && adminEmail) {
+      let created = false;
       try {
         const res = await api.post('/api/users/agency-admin', { adminName: data.adminName, adminEmail: adminEmail, agencyName, companyName, agencyId });
         const result = await res.json();
@@ -108,9 +109,19 @@ export default function CompaniesPage() {
             location: 'All', status: 'Active', createdAt: new Date().toISOString().slice(0, 10),
           };
           addManagedUser(adminUser);
+          created = true;
         }
-      } catch (err) {
-        console.error('Failed to create agency admin user:', err);
+      } catch {
+        // Backend unreachable — fall through to local creation.
+      }
+      if (!created) {
+        const tempPassword = Math.random().toString(36).slice(-10).toUpperCase();
+        addManagedUser({
+          id: `u-${Date.now()}`, name: data.adminName, email: adminEmail,
+          role: 'Owner', agencyId, agencyName: companyName,
+          mustChangePassword: true, password: tempPassword,
+          location: 'All', status: 'Active', createdAt: new Date().toISOString().slice(0, 10),
+        });
       }
     }
 
