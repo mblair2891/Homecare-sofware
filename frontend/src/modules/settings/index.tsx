@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Settings, Save, CheckCircle } from 'lucide-react';
+import { Settings, Save, CheckCircle, X, UserPlus, Mail, Loader, AlertTriangle } from 'lucide-react';
+import { useAuthStore, type UserRole, type ManagedUser } from '../../store/useAuthStore';
+import { useAppStore } from '../../store/useAppStore';
 
 type SettingsTab = 'agency' | 'system' | 'rates' | 'users' | 'integrations' | 'notifications';
 
@@ -16,23 +18,234 @@ const integrations = [
   { name: 'Google Maps', desc: 'Caregiver location verification', status: 'Not Connected', icon: '🗺️' },
 ];
 
-const users: { name: string; email: string; role: string; location: string; status: string }[] = [];
+const billingRates: { service: string; rate: string; payer: string }[] = [];
 
-const billingRates = [
-  { service: 'Personal Care — Hourly', rate: '$28.00', payer: 'Private Pay' },
-  { service: 'Personal Care — Hourly', rate: '$26.50', payer: 'Medicaid' },
-  { service: 'Personal Care — Hourly', rate: '$28.00', payer: 'Veterans' },
-  { service: 'Medication Assistance — Hourly', rate: '$32.00', payer: 'Private Pay' },
-  { service: 'Medication Administration — Hourly', rate: '$38.00', payer: 'Private Pay' },
-  { service: 'Nursing Services — Hourly', rate: '$65.00', payer: 'Private Pay' },
-  { service: 'Housekeeping — Hourly', rate: '$24.00', payer: 'Private Pay' },
+const ROLES: { value: UserRole; label: string; description: string }[] = [
+  { value: 'Administrator', label: 'Administrator', description: 'Full access to all agency modules' },
+  { value: 'Coordinator', label: 'Coordinator', description: 'Scheduling, clients, caregivers' },
+  { value: 'Nurse', label: 'Nurse (RN/LPN)', description: 'Clinical forms, assessments, medication' },
+  { value: 'Biller', label: 'Biller', description: 'Billing, invoices, payroll' },
+  { value: 'ReadOnly', label: 'Read Only', description: 'View-only access across modules' },
 ];
+
+// ─── Add User Modal ─────────────────────────────────────────────────────────
+
+function AddUserModal({ onClose, onUserCreated }: { onClose: () => void; onUserCreated: (user: ManagedUser, tempPassword: string) => void }) {
+  const { user: currentUser, impersonatingAgency } = useAuthStore();
+  const { locations } = useAppStore();
+  const [form, setForm] = useState({ name: '', email: '', role: 'Coordinator' as UserRole, location: 'All' });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState<{ email: string; tempPassword: string } | null>(null);
+
+  const agencyName = impersonatingAgency?.name || currentUser?.agencyName || 'Your Agency';
+  const agencyId = impersonatingAgency?.id || currentUser?.agencyId || 'agency-default';
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!form.name.trim() || !form.email.trim()) {
+      setError('Name and email are required.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          role: form.role,
+          location: form.location,
+          agencyId,
+          agencyName,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create user');
+
+      const managedUser: ManagedUser = {
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role as UserRole,
+        agencyId,
+        agencyName,
+        mustChangePassword: true,
+        password: data.tempPassword,
+        location: data.user.location,
+        status: 'Active',
+        createdAt: new Date().toISOString().slice(0, 10),
+      };
+
+      setSuccess({ email: data.user.email, tempPassword: data.tempPassword });
+      onUserCreated(managedUser, data.tempPassword);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create user. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+              <UserPlus size={18} className="text-blue-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Add New User</h2>
+              <p className="text-xs text-slate-400">{agencyName}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {success ? (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                <CheckCircle size={32} className="mx-auto text-green-500 mb-2" />
+                <p className="text-sm font-semibold text-green-800">User Created Successfully</p>
+                <p className="text-xs text-green-600 mt-1">A welcome email has been sent to {success.email}</p>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Login Credentials</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Email</span>
+                    <span className="text-sm font-medium text-slate-800">{success.email}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-500">Temp Password</span>
+                    <code className="text-sm font-bold text-slate-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">{success.tempPassword}</code>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                <AlertTriangle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-700">
+                  Save these credentials — the temporary password will not be shown again.
+                  The user will be prompted to change it on first login.
+                </p>
+              </div>
+              <button onClick={onClose} className="w-full btn-primary py-2">Done</button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="form-label">Full Name *</label>
+                  <input
+                    className="form-input"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Jane Smith"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="form-label">Email Address *</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="jane@youragency.com"
+                  />
+                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                    <Mail size={11} /> A welcome email with login credentials will be sent to this address
+                  </p>
+                </div>
+                <div>
+                  <label className="form-label">Role *</label>
+                  <select
+                    className="form-input"
+                    value={form.role}
+                    onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {ROLES.find((r) => r.value === form.role)?.description}
+                  </p>
+                </div>
+                <div>
+                  <label className="form-label">Location Access</label>
+                  <select
+                    className="form-input"
+                    value={form.location}
+                    onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  >
+                    <option value="All">All Locations</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.name}>{loc.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
+                  <AlertTriangle size={14} className="text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button onClick={onClose} className="flex-1 btn-secondary py-2">Cancel</button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="flex-1 btn-primary py-2 flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <><Loader size={14} className="animate-spin" /> Creating...</>
+                  ) : (
+                    <><UserPlus size={14} /> Create User & Send Email</>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Settings Module ───────────────────────────────────────────────────
 
 export default function SettingsModule() {
   const [tab, setTab] = useState<SettingsTab>('agency');
   const [saved, setSaved] = useState(false);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const { managedUsers, addManagedUser, user: currentUser, impersonatingAgency } = useAuthStore();
 
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
+  // Filter users for current agency context
+  const agencyId = impersonatingAgency?.id || currentUser?.agencyId;
+  const agencyUsers = managedUsers.filter((u) => {
+    if (u.role === 'SuperAdmin') return false;
+    if (!agencyId) return u.role !== 'SuperAdmin';
+    return u.agencyId === agencyId;
+  });
+
+  const handleUserCreated = (user: ManagedUser, _tempPassword: string) => {
+    addManagedUser(user);
+  };
 
   return (
     <div className="space-y-6">
@@ -106,7 +319,14 @@ export default function SettingsModule() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {billingRates.map((r, i) => (
+              {billingRates.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
+                    <p className="text-sm font-medium">No billing rates configured</p>
+                    <p className="text-xs mt-1">Add rates for your agency's services</p>
+                  </td>
+                </tr>
+              ) : billingRates.map((r, i) => (
                 <tr key={i} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-sm font-medium">{r.service}</td>
                   <td className="px-4 py-3 text-sm font-bold text-green-700">{r.rate}/hr</td>
@@ -124,7 +344,9 @@ export default function SettingsModule() {
         <div className="card overflow-hidden max-w-3xl">
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <h2 className="font-semibold text-slate-800">Users & Role-Based Access</h2>
-            <button className="btn-primary text-sm">Add User</button>
+            <button onClick={() => setShowAddUser(true)} className="btn-primary text-sm flex items-center gap-2">
+              <UserPlus size={14} /> Add User
+            </button>
           </div>
           <table className="w-full">
             <thead>
@@ -133,14 +355,15 @@ export default function SettingsModule() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.length === 0 ? (
+              {agencyUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                    <UserPlus size={28} className="mx-auto mb-3 opacity-40" />
                     <p className="text-sm font-medium">No users added yet</p>
-                    <p className="text-xs mt-1">Add users to manage access and roles</p>
+                    <p className="text-xs mt-1">Add users to manage access and roles. Each user will receive a welcome email with their login credentials.</p>
                   </td>
                 </tr>
-              ) : users.map(user => (
+              ) : agencyUsers.map(user => (
                 <tr key={user.email} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="text-sm font-medium">{user.name}</div>
@@ -148,7 +371,12 @@ export default function SettingsModule() {
                   </td>
                   <td className="px-4 py-3"><span className="badge-blue">{user.role}</span></td>
                   <td className="px-4 py-3 text-sm text-slate-500">{user.location}</td>
-                  <td className="px-4 py-3"><span className="badge-green">{user.status}</span></td>
+                  <td className="px-4 py-3">
+                    <span className={user.status === 'Active' ? 'badge-green' : 'badge-gray'}>{user.status}</span>
+                    {user.mustChangePassword && (
+                      <span className="ml-2 text-xs text-amber-600 font-medium">Pending first login</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><button className="text-sm text-blue-600 hover:text-blue-800">Edit</button></td>
                 </tr>
               ))}
@@ -208,6 +436,14 @@ export default function SettingsModule() {
           ))}
           <button onClick={save} className="btn-primary flex items-center gap-2"><Save size={14} /> Save Changes</button>
         </div>
+      )}
+
+      {/* Add User Modal */}
+      {showAddUser && (
+        <AddUserModal
+          onClose={() => setShowAddUser(false)}
+          onUserCreated={handleUserCreated}
+        />
       )}
     </div>
   );

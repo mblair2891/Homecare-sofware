@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useAuthStore } from '../../store/useAuthStore';
+import { useAuthStore, type ManagedUser } from '../../store/useAuthStore';
 import { usePlatformStore, MRR_BY_PLAN, type Company, type CompanyStatus } from '../../store/usePlatformStore';
 import type { NewAgencyData } from './AddAgencyModal';
 import {
@@ -28,7 +28,7 @@ const planColors: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CompaniesPage() {
-  const { enterAgency } = useAuthStore();
+  const { enterAgency, addManagedUser } = useAuthStore();
   const { companies, addCompany, updateCompanyStatus, removeCompany } = usePlatformStore();
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -47,11 +47,16 @@ export default function CompaniesPage() {
   const allCaregivers = companies.reduce((s, c) => s + c.agencies.reduce((a, ag) => a + ag.caregivers, 0), 0);
   const activeCount = companies.filter((c) => c.status === 'Active').length;
 
-  const handleSave = (data: NewAgencyData) => {
+  const handleSave = async (data: NewAgencyData) => {
     const companyId = `company-${Date.now()}`;
+    const agencyId = `agency-${Date.now()}`;
+    const agencyName = data.legalName || data.companyName;
+    const companyName = data.companyName || data.legalName;
+    const adminEmail = (data.adminEmail || data.agencyEmail).trim().toLowerCase();
+
     const company: Company = {
       id: companyId,
-      companyName: data.companyName || data.legalName,
+      companyName: companyName,
       plan: data.plan,
       status: data.plan === 'Trial' ? 'Trial' : 'Active',
       billingCycle: data.billingCycle,
@@ -59,17 +64,17 @@ export default function CompaniesPage() {
       joinedDate: new Date().toISOString().slice(0, 10),
       notes: data.notes,
       primaryContactName: data.adminName,
-      primaryContactEmail: data.adminEmail || data.agencyEmail,
+      primaryContactEmail: adminEmail,
       primaryContactPhone: data.adminPhone || data.agencyPhone,
       billingContactName: data.sameBillingContact ? data.adminName : data.billingName,
-      billingContactEmail: data.sameBillingContact ? data.adminEmail : data.billingEmail,
+      billingContactEmail: data.sameBillingContact ? adminEmail : data.billingEmail,
       afterHoursName: data.afterHoursName,
       afterHoursPhone: data.afterHoursPhone,
       agencies: [
         {
-          id: `agency-${Date.now()}`,
+          id: agencyId,
           companyId,
-          name: data.legalName || data.companyName,
+          name: agencyName,
           state: data.state,
           classification: data.classification,
           licenseNumber: data.licenseNumber,
@@ -100,6 +105,45 @@ export default function CompaniesPage() {
       ],
     };
     addCompany(company);
+
+    // Create admin user account for the new agency and send welcome email
+    if (data.adminName && adminEmail) {
+      try {
+        const res = await fetch('/api/users/agency-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            adminName: data.adminName,
+            adminEmail: adminEmail,
+            agencyName,
+            companyName,
+            agencyId,
+          }),
+        });
+
+        const result = await res.json();
+        if (res.ok && result.tempPassword) {
+          // Register the admin user in the auth store so they can log in
+          const adminUser: ManagedUser = {
+            id: result.user.id,
+            name: data.adminName,
+            email: adminEmail,
+            role: 'Owner',
+            agencyId,
+            agencyName: companyName,
+            mustChangePassword: true,
+            password: result.tempPassword,
+            location: 'All',
+            status: 'Active',
+            createdAt: new Date().toISOString().slice(0, 10),
+          };
+          addManagedUser(adminUser);
+        }
+      } catch (err) {
+        console.error('Failed to create agency admin user:', err);
+      }
+    }
+
     setShowAdd(false);
   };
 
