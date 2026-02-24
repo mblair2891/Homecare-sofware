@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, authenticate } from '../middleware/auth';
+import { authorize, agencyScope, locationFilter } from '../middleware/rbac';
 import { AgencyClassification } from '@prisma/client';
 
 const router = Router();
@@ -41,13 +42,15 @@ function parseOptionalDate(val?: string): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
-// GET /api/caregivers
-router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── GET /api/caregivers ───────────────────────────────────────────────────────
+// Biller role excluded — caregivers are clinical staff, Billers don't need contact/clinical detail
+router.get('/', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse', 'ReadOnly'), async (req: AuthRequest, res: Response) => {
   try {
     const { status, locationId, search } = req.query;
-    const where: any = { agencyId: req.user!.agencyId };
+    const where: any = agencyScope(req);
+
     if (status && status !== 'all') where.status = status;
-    if (locationId) where.locationId = locationId as string;
+    if (locationId && !locationFilter(req)) where.locationId = locationId as string;
     if (search) where.name = { contains: search as string, mode: 'insensitive' };
 
     const caregivers = await prisma.caregiver.findMany({
@@ -66,15 +69,20 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/caregivers/:id
-router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── GET /api/caregivers/:id ───────────────────────────────────────────────────
+router.get('/:id', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse', 'ReadOnly'), async (req: AuthRequest, res: Response) => {
   try {
+    const where: any = { id: req.params.id, agencyId: req.user!.agencyId };
+    const locId = locationFilter(req);
+    if (locId) where.locationId = locId;
+
     const caregiver = await prisma.caregiver.findFirst({
-      where: { id: req.params.id, agencyId: req.user!.agencyId },
+      where,
       include: {
         location: { select: { id: true, name: true } },
         clientCaregivers: { include: { client: { select: { id: true, name: true, address: true } } } },
         shifts: { orderBy: { date: 'desc' }, take: 20 },
+        availability: { orderBy: { dayOfWeek: 'asc' } },
       },
     });
 
@@ -86,8 +94,9 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/caregivers
-router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── POST /api/caregivers ─────────────────────────────────────────────────────
+// Owner, Administrator, Coordinator only — Nurses cannot create caregiver records
+router.post('/', authenticate, authorize('Owner', 'Administrator', 'Coordinator'), async (req: AuthRequest, res: Response) => {
   try {
     const data = CaregiverSchema.parse(req.body);
     const classification = CLASSIFICATION_MAP[data.classification];
@@ -126,11 +135,10 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// PATCH /api/caregivers/:id
-router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── PATCH /api/caregivers/:id ────────────────────────────────────────────────
+router.patch('/:id', authenticate, authorize('Owner', 'Administrator', 'Coordinator'), async (req: AuthRequest, res: Response) => {
   try {
     const data = CaregiverSchema.partial().parse(req.body);
-
     const existing = await prisma.caregiver.findFirst({ where: { id: req.params.id, agencyId: req.user!.agencyId } });
     if (!existing) return res.status(404).json({ error: 'Caregiver not found' });
 
@@ -159,8 +167,8 @@ router.patch('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/caregivers/:id/compliance
-router.get('/:id/compliance', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── GET /api/caregivers/:id/compliance ───────────────────────────────────────
+router.get('/:id/compliance', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse', 'ReadOnly'), async (req: AuthRequest, res: Response) => {
   try {
     const caregiver = await prisma.caregiver.findFirst({
       where: { id: req.params.id, agencyId: req.user!.agencyId },

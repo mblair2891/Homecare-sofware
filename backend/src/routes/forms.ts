@@ -1,16 +1,17 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest, authenticate } from '../middleware/auth';
+import { authorize } from '../middleware/rbac';
 
 const router = Router();
 
-// POST /api/forms/save
-router.post('/save', authenticate, async (req: AuthRequest, res: Response) => {
+// ─── POST /api/forms/save ─────────────────────────────────────────────────────
+// Owner, Administrator, Coordinator, Nurse — clinical staff complete forms
+router.post('/save', authenticate, authorize('Owner', 'Administrator', 'Coordinator', 'Nurse'), async (req: AuthRequest, res: Response) => {
   try {
     const { formId, clientId, formData, completedBy, signatureData } = req.body;
     if (!formId || !clientId) return res.status(400).json({ error: 'formId and clientId required' });
 
-    // Verify client belongs to agency
     const client = await prisma.client.findFirst({ where: { id: clientId, agencyId: req.user!.agencyId } });
     if (!client) return res.status(400).json({ error: 'Client not found in your agency' });
 
@@ -24,7 +25,7 @@ router.post('/save', authenticate, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    // Update client compliance dates based on form type
+    // Auto-update client Oregon compliance dates when a form is saved
     const dateUpdates: Record<string, string> = {
       'CF01': 'disclosureSignedDate',
       'CF02': 'rightsSignedDate',
@@ -52,12 +53,11 @@ router.post('/save', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// GET /api/forms/client/:clientId
+// ─── GET /api/forms/client/:clientId ─────────────────────────────────────────
+// All authenticated roles can view form records (read-only roles need audit visibility)
 router.get('/client/:clientId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { clientId } = req.params;
-
-    // Verify client belongs to agency
     const client = await prisma.client.findFirst({ where: { id: clientId, agencyId: req.user!.agencyId } });
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
@@ -73,7 +73,27 @@ router.get('/client/:clientId', authenticate, async (req: AuthRequest, res: Resp
   }
 });
 
-// GET /api/forms/:formId/template
+// ─── DELETE /api/forms/:recordId ─────────────────────────────────────────────
+// Owner and Administrator only — form records should rarely be deleted
+router.delete('/:recordId', authenticate, authorize('Owner', 'Administrator'), async (req: AuthRequest, res: Response) => {
+  try {
+    const record = await prisma.formRecord.findFirst({
+      where: { id: req.params.recordId },
+      include: { client: { select: { agencyId: true } } },
+    });
+    if (!record || record.client.agencyId !== req.user!.agencyId) {
+      return res.status(404).json({ error: 'Form record not found' });
+    }
+    await prisma.formRecord.delete({ where: { id: req.params.recordId } });
+    res.json({ message: 'Form record deleted' });
+  } catch (err) {
+    console.error('Delete form error:', err);
+    res.status(500).json({ error: 'Failed to delete form record' });
+  }
+});
+
+// ─── GET /api/forms/:formId/template ─────────────────────────────────────────
+// Public — template metadata contains no sensitive data
 router.get('/:formId/template', async (req: AuthRequest, res: Response) => {
   const templates: Record<string, { title: string; oar: string; fields: string[] }> = {
     CF01: { title: 'Client Disclosure Statement', oar: 'OAR 333-536-0055(3)', fields: ['clientName', 'agencyName', 'classification', 'services', 'chargesPerHour', 'billingFrequency', 'terminationPolicy'] },
