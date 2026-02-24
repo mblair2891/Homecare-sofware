@@ -8,6 +8,7 @@ import {
   Shield,
 } from 'lucide-react';
 import AddAgencyModal from './AddAgencyModal';
+import CompanyManageModal from './CompanyManageModal';
 
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 
@@ -34,6 +35,7 @@ export default function CompaniesPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [managingCompany, setManagingCompany] = useState<Company | null>(null);
 
   const filtered = companies.filter(
     (c) =>
@@ -56,7 +58,7 @@ export default function CompaniesPage() {
 
     const company: Company = {
       id: companyId,
-      companyName: companyName,
+      companyName,
       plan: data.plan,
       status: data.plan === 'Trial' ? 'Trial' : 'Active',
       billingCycle: data.billingCycle,
@@ -72,70 +74,41 @@ export default function CompaniesPage() {
       afterHoursPhone: data.afterHoursPhone,
       agencies: [
         {
-          id: agencyId,
-          companyId,
-          name: agencyName,
-          state: data.state,
-          classification: data.classification,
-          licenseNumber: data.licenseNumber,
-          licenseExpiry: data.licenseExpiry,
-          licenseIssuedDate: data.licenseIssuedDate,
-          licenseVerified: data.licenseVerified,
-          licenseStatus: data.licenseStatus,
-          physicalAddress: data.physicalAddress,
-          physicalCity: data.physicalCity,
-          physicalState: data.physicalState,
-          physicalZip: data.physicalZip,
+          id: agencyId, companyId,
+          name: agencyName, state: data.state,
+          classification: data.classification, licenseNumber: data.licenseNumber,
+          licenseExpiry: data.licenseExpiry, licenseIssuedDate: data.licenseIssuedDate,
+          licenseVerified: data.licenseVerified, licenseStatus: data.licenseStatus,
+          physicalAddress: data.physicalAddress, physicalCity: data.physicalCity,
+          physicalState: data.physicalState, physicalZip: data.physicalZip,
           physicalCounty: data.physicalCounty,
-          agencyPhone: data.agencyPhone,
-          agencyEmail: data.agencyEmail,
-          taxId: data.taxId,
-          npiNumber: data.npiNumber,
-          medicareCertified: data.medicareCertified,
-          medicareProviderNumber: data.medicareProviderNumber,
-          medicaidCertified: data.medicaidCertified,
-          medicaidProviderNumber: data.medicaidProviderNumber,
-          servicesOffered: data.servicesOffered,
-          serviceCounties: data.serviceCounties,
-          payerTypes: data.payerTypes,
-          languages: data.languages,
-          clients: 0,
-          caregivers: 0,
+          agencyPhone: data.agencyPhone, agencyEmail: data.agencyEmail,
+          taxId: data.taxId, npiNumber: data.npiNumber,
+          medicareCertified: data.medicareCertified, medicareProviderNumber: data.medicareProviderNumber,
+          medicaidCertified: data.medicaidCertified, medicaidProviderNumber: data.medicaidProviderNumber,
+          servicesOffered: data.servicesOffered, serviceCounties: data.serviceCounties,
+          payerTypes: data.payerTypes, languages: data.languages,
+          clients: 0, caregivers: 0,
         },
       ],
     };
     addCompany(company);
 
-    // Create admin user account for the new agency and send welcome email
+    // Auto-create admin user for the new agency and send welcome email
     if (data.adminName && adminEmail) {
       try {
         const res = await fetch('/api/users/agency-admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            adminName: data.adminName,
-            adminEmail: adminEmail,
-            agencyName,
-            companyName,
-            agencyId,
-          }),
+          body: JSON.stringify({ adminName: data.adminName, adminEmail: adminEmail, agencyName, companyName, agencyId }),
         });
-
         const result = await res.json();
         if (res.ok && result.tempPassword) {
-          // Register the admin user in the auth store so they can log in
           const adminUser: ManagedUser = {
-            id: result.user.id,
-            name: data.adminName,
-            email: adminEmail,
-            role: 'Owner',
-            agencyId,
-            agencyName: companyName,
-            mustChangePassword: true,
-            password: result.tempPassword,
-            location: 'All',
-            status: 'Active',
-            createdAt: new Date().toISOString().slice(0, 10),
+            id: result.user.id, name: data.adminName, email: adminEmail,
+            role: 'Owner', agencyId, agencyName: companyName,
+            mustChangePassword: true, password: result.tempPassword,
+            location: 'All', status: 'Active', createdAt: new Date().toISOString().slice(0, 10),
           };
           addManagedUser(adminUser);
         }
@@ -281,6 +254,9 @@ export default function CompaniesPage() {
                             {openMenu === company.id && (
                               <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-20 py-1">
                                 <button onClick={() => { const first = company.agencies[0]; if (first) { enterAgency(first.id, company.companyName); } setOpenMenu(null); }} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-700">Open Dashboard</button>
+                                <button onClick={() => { setManagingCompany(company); setOpenMenu(null); }} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-700 flex items-center gap-2">
+                                  <Users size={14} /> Manage Users
+                                </button>
                                 <button onClick={() => handleSuspend(company)} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-slate-700">
                                   {company.status === 'Suspended' ? 'Reactivate' : 'Suspend'} Company
                                 </button>
@@ -349,6 +325,7 @@ export default function CompaniesPage() {
       </div>
 
       {showAdd && <AddAgencyModal onClose={() => setShowAdd(false)} onSave={handleSave} />}
+      {managingCompany && <CompanyManageModal company={managingCompany} onClose={() => setManagingCompany(null)} />}
       {openMenu && <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(null)} />}
     </div>
   );

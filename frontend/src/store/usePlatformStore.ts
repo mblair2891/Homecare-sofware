@@ -65,8 +65,7 @@ export const MRR_BY_PLAN: Record<AgencyPlan, number> = {
   Enterprise: 599,
 };
 
-// ─── Seed Data ────────────────────────────────────────────────────────────────
-// No seed companies — clean slate for production use.
+// ─── No seed data — clean slate ──────────────────────────────────────────────
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
