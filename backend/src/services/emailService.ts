@@ -1,8 +1,5 @@
 import nodemailer from 'nodemailer';
 
-// ─── SMTP Configuration ─────────────────────────────────────────────────────
-// Uses SMTP_* env vars when available. Falls back to console logging if not configured.
-
 const SMTP_CONFIGURED =
   process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
 
@@ -11,23 +8,13 @@ const transporter = SMTP_CONFIGURED
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 587,
       secure: Number(process.env.SMTP_PORT) === 465,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     })
   : null;
 
 const FROM_ADDRESS = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@careaxis.io';
 
-// ─── Send Email Helper ──────────────────────────────────────────────────────
-
-interface EmailOptions {
-  to: string;
-  subject: string;
-  html: string;
-  text?: string;
-}
+interface EmailOptions { to: string; subject: string; html: string; text?: string; }
 
 export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; message: string }> {
   if (!transporter) {
@@ -39,15 +26,8 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
     console.log('──────────────────────────────────────────────────');
     return { success: true, message: 'Email logged to console (SMTP not configured)' };
   }
-
   try {
-    await transporter.sendMail({
-      from: FROM_ADDRESS,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-    });
+    await transporter.sendMail({ from: FROM_ADDRESS, ...options });
     return { success: true, message: `Email sent to ${options.to}` };
   } catch (err: any) {
     console.error('Email send failed:', err.message);
@@ -55,182 +35,71 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
   }
 }
 
-// ─── Pre-built Email Templates ──────────────────────────────────────────────
-
-export function buildWelcomeEmail(params: {
-  recipientName: string;
-  email: string;
-  tempPassword: string;
-  role: string;
-  agencyName: string;
-  loginUrl?: string;
+export function buildWelcomeEmail(p: {
+  recipientName: string; email: string; tempPassword: string; role: string; agencyName: string; loginUrl?: string;
 }): EmailOptions {
-  const loginUrl = params.loginUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-      <div style="background: linear-gradient(135deg, #1e40af, #3b82f6); border-radius: 12px; padding: 32px; color: white; text-align: center; margin-bottom: 32px;">
-        <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700;">Welcome to CareAxis</h1>
-        <p style="margin: 0; opacity: 0.9; font-size: 14px;">${params.agencyName}</p>
+  const url = p.loginUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
+  return {
+    to: p.email,
+    subject: `Your CareAxis Account — ${p.agencyName}`,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:40px 20px">
+      <div style="background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:12px;padding:32px;color:#fff;text-align:center;margin-bottom:32px">
+        <h1 style="margin:0 0 8px;font-size:24px">Welcome to CareAxis</h1>
+        <p style="margin:0;opacity:.9;font-size:14px">${p.agencyName}</p>
       </div>
-
-      <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hi ${params.recipientName},</p>
-
-      <p style="color: #334155; font-size: 16px; line-height: 1.6;">
-        Your account has been created for <strong>${params.agencyName}</strong>.
-        Below are your login credentials:
-      </p>
-
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px; width: 120px;">Login URL</td>
-            <td style="padding: 8px 0; font-size: 14px;"><a href="${loginUrl}" style="color: #2563eb;">${loginUrl}</a></td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Email</td>
-            <td style="padding: 8px 0; font-size: 14px; font-weight: 600; color: #1e293b;">${params.email}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Temp Password</td>
-            <td style="padding: 8px 0; font-family: monospace; font-size: 16px; font-weight: 700; color: #1e293b; letter-spacing: 1px;">${params.tempPassword}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Role</td>
-            <td style="padding: 8px 0; font-size: 14px; color: #1e293b;">${params.role}</td>
-          </tr>
+      <p style="color:#334155;font-size:16px;line-height:1.6">Hi ${p.recipientName},</p>
+      <p style="color:#334155;font-size:16px;line-height:1.6">Your account has been created for <strong>${p.agencyName}</strong>.</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:24px 0">
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px;width:120px">Login URL</td><td style="padding:8px 0;font-size:14px"><a href="${url}" style="color:#2563eb">${url}</a></td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Email</td><td style="padding:8px 0;font-size:14px;font-weight:600;color:#1e293b">${p.email}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Temp Password</td><td style="padding:8px 0;font-family:monospace;font-size:16px;font-weight:700;color:#1e293b;letter-spacing:1px">${p.tempPassword}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Role</td><td style="padding:8px 0;font-size:14px;color:#1e293b">${p.role}</td></tr>
         </table>
       </div>
-
-      <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 16px; margin: 24px 0;">
-        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-          Important: Please change your password after your first login.
-        </p>
+      <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:16px;margin:24px 0">
+        <p style="margin:0;color:#92400e;font-size:14px;font-weight:600">Important: Please change your password after your first login.</p>
       </div>
-
-      <p style="color: #64748b; font-size: 13px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-        This is an automated message from CareAxis. If you did not expect this email, please contact your administrator.
-      </p>
-    </div>
-  `;
-
-  const text = `Welcome to CareAxis — ${params.agencyName}
-
-Hi ${params.recipientName},
-
-Your account has been created. Here are your login credentials:
-
-  Login URL: ${loginUrl}
-  Email: ${params.email}
-  Temporary Password: ${params.tempPassword}
-  Role: ${params.role}
-
-IMPORTANT: Please change your password after your first login.
-
-— CareAxis`;
-
-  return {
-    to: params.email,
-    subject: `Your CareAxis Account — ${params.agencyName}`,
-    html,
-    text,
+    </div>`,
+    text: `Welcome to CareAxis — ${p.agencyName}\n\nHi ${p.recipientName},\n\nYour account:\n  URL: ${url}\n  Email: ${p.email}\n  Password: ${p.tempPassword}\n  Role: ${p.role}\n\nPlease change your password after first login.`,
   };
 }
 
-export function buildAgencyWelcomeEmail(params: {
-  adminName: string;
-  email: string;
-  tempPassword: string;
-  agencyName: string;
-  companyName: string;
-  loginUrl?: string;
+export function buildAgencyWelcomeEmail(p: {
+  adminName: string; email: string; tempPassword: string; agencyName: string; companyName: string; loginUrl?: string;
 }): EmailOptions {
-  const loginUrl = params.loginUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
-
-  const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
-      <div style="background: linear-gradient(135deg, #059669, #10b981); border-radius: 12px; padding: 32px; color: white; text-align: center; margin-bottom: 32px;">
-        <h1 style="margin: 0 0 8px; font-size: 24px; font-weight: 700;">Welcome to CareAxis</h1>
-        <p style="margin: 0; opacity: 0.9; font-size: 14px;">Your agency has been onboarded</p>
+  const url = p.loginUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
+  return {
+    to: p.email,
+    subject: `Your Agency is Live on CareAxis — ${p.agencyName}`,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:40px 20px">
+      <div style="background:linear-gradient(135deg,#059669,#10b981);border-radius:12px;padding:32px;color:#fff;text-align:center;margin-bottom:32px">
+        <h1 style="margin:0 0 8px;font-size:24px">Welcome to CareAxis</h1>
+        <p style="margin:0;opacity:.9;font-size:14px">Your agency has been onboarded</p>
       </div>
-
-      <p style="color: #334155; font-size: 16px; line-height: 1.6;">Hi ${params.adminName},</p>
-
-      <p style="color: #334155; font-size: 16px; line-height: 1.6;">
-        <strong>${params.companyName}</strong> — <strong>${params.agencyName}</strong> has been set up on the CareAxis platform.
-        As the primary administrator, you can log in and begin configuring your agency.
-      </p>
-
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px; width: 120px;">Login URL</td>
-            <td style="padding: 8px 0; font-size: 14px;"><a href="${loginUrl}" style="color: #2563eb;">${loginUrl}</a></td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Email</td>
-            <td style="padding: 8px 0; font-size: 14px; font-weight: 600; color: #1e293b;">${params.email}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Temp Password</td>
-            <td style="padding: 8px 0; font-family: monospace; font-size: 16px; font-weight: 700; color: #1e293b; letter-spacing: 1px;">${params.tempPassword}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Role</td>
-            <td style="padding: 8px 0; font-size: 14px; color: #1e293b;">Administrator (Owner)</td>
-          </tr>
+      <p style="color:#334155;font-size:16px;line-height:1.6">Hi ${p.adminName},</p>
+      <p style="color:#334155;font-size:16px;line-height:1.6"><strong>${p.companyName}</strong> — <strong>${p.agencyName}</strong> has been set up on CareAxis.</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin:24px 0">
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px;width:120px">Login URL</td><td style="padding:8px 0;font-size:14px"><a href="${url}" style="color:#2563eb">${url}</a></td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Email</td><td style="padding:8px 0;font-size:14px;font-weight:600;color:#1e293b">${p.email}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Temp Password</td><td style="padding:8px 0;font-family:monospace;font-size:16px;font-weight:700;color:#1e293b;letter-spacing:1px">${p.tempPassword}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;font-size:14px">Role</td><td style="padding:8px 0;font-size:14px;color:#1e293b">Administrator (Owner)</td></tr>
         </table>
       </div>
-
-      <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; margin: 24px 0;">
-        <p style="margin: 0 0 8px; color: #166534; font-size: 14px; font-weight: 600;">Getting Started:</p>
-        <ol style="margin: 0; padding-left: 20px; color: #166534; font-size: 13px; line-height: 1.8;">
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:16px;margin:24px 0">
+        <p style="margin:0 0 8px;color:#166534;font-size:14px;font-weight:600">Getting Started:</p>
+        <ol style="margin:0;padding-left:20px;color:#166534;font-size:13px;line-height:1.8">
           <li>Log in and change your password</li>
           <li>Complete your agency profile in Settings</li>
-          <li>Add staff users under Settings &rarr; Users & Roles</li>
+          <li>Add staff users under Settings &rarr; Users &amp; Roles</li>
           <li>Begin adding clients and caregivers</li>
         </ol>
       </div>
-
-      <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 16px; margin: 24px 0;">
-        <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
-          Important: Please change your password after your first login.
-        </p>
+      <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:16px;margin:24px 0">
+        <p style="margin:0;color:#92400e;font-size:14px;font-weight:600">Important: Please change your password after your first login.</p>
       </div>
-
-      <p style="color: #64748b; font-size: 13px; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-        This is an automated message from CareAxis. If you did not expect this email, please contact support.
-      </p>
-    </div>
-  `;
-
-  const text = `Welcome to CareAxis
-
-Hi ${params.adminName},
-
-${params.companyName} — ${params.agencyName} has been set up on the CareAxis platform.
-
-Your admin login credentials:
-
-  Login URL: ${loginUrl}
-  Email: ${params.email}
-  Temporary Password: ${params.tempPassword}
-  Role: Administrator (Owner)
-
-Getting Started:
-  1. Log in and change your password
-  2. Complete your agency profile in Settings
-  3. Add staff users under Settings > Users & Roles
-  4. Begin adding clients and caregivers
-
-IMPORTANT: Please change your password after your first login.
-
-— CareAxis`;
-
-  return {
-    to: params.email,
-    subject: `Your Agency is Live on CareAxis — ${params.agencyName}`,
-    html,
-    text,
+    </div>`,
+    text: `Welcome to CareAxis\n\nHi ${p.adminName},\n\n${p.companyName} — ${p.agencyName} is live.\n\n  URL: ${url}\n  Email: ${p.email}\n  Password: ${p.tempPassword}\n  Role: Administrator (Owner)\n\nPlease change your password after first login.`,
   };
 }

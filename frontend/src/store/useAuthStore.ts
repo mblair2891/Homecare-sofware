@@ -33,7 +33,6 @@ interface AuthStore {
   updateManagedUser: (email: string, updates: Partial<ManagedUser>) => void;
 }
 
-// Default platform admin — always available
 const DEFAULT_ADMIN: ManagedUser = {
   id: 'sa-1',
   email: 'admin@careaxis.io',
@@ -53,24 +52,17 @@ export const useAuthStore = create<AuthStore>()(
       managedUsers: [DEFAULT_ADMIN],
 
       login: async (email, password) => {
-        await new Promise((r) => setTimeout(r, 400)); // simulate network
-
-        const allUsers = get().managedUsers;
-        const match = allUsers.find(
+        await new Promise((r) => setTimeout(r, 400));
+        const match = get().managedUsers.find(
           (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password && u.status === 'Active'
         );
-
         if (!match) throw new Error('Invalid email or password');
-
         const { password: _p, location: _l, status: _s, createdAt: _c, ...authUser } = match;
         set({ user: authUser, impersonatingAgency: null });
       },
 
       logout: () => set({ user: null, impersonatingAgency: null }),
-
-      enterAgency: (agencyId, agencyName) =>
-        set({ impersonatingAgency: { id: agencyId, name: agencyName } }),
-
+      enterAgency: (agencyId, agencyName) => set({ impersonatingAgency: { id: agencyId, name: agencyName } }),
       exitAgency: () => set({ impersonatingAgency: null }),
 
       addManagedUser: (user) =>
