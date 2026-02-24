@@ -103,7 +103,7 @@ export default function ClientFile({ client, onClose }: { client: Client; onClos
             <div className="form-section">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">Client Information</h3>
               <div className="space-y-2 text-sm">
-                {[['DOB', format(parseISO(client.dob), 'MM/dd/yyyy')], ['Address', client.address], ['Phone', client.phone], ['Status', client.status], ['Location', client.location], ['Classification', client.classification], ['Payer', client.payer], ['Start Date', format(parseISO(client.startDate), 'MM/dd/yyyy')]].map(([k, v]) => (
+                {[['DOB', format(parseISO(client.dob), 'MM/dd/yyyy')], ['Address', client.address], ['Phone', client.phone], ['Status', client.status], ['Location', client.location], ['Payer', client.payer], ['Start Date', format(parseISO(client.startDate), 'MM/dd/yyyy')]].map(([k, v]) => (
                   <div key={k} className="flex gap-2"><span className="text-slate-400 w-28 flex-shrink-0">{k}:</span><span className="text-slate-700 font-medium">{v}</span></div>
                 ))}
               </div>

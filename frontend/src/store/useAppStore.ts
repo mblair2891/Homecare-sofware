@@ -22,7 +22,6 @@ export interface Client {
   location: string;
   startDate: string;
   assignedCaregivers: string[];
-  classification: AgencyClassification;
   canSelfDirect: boolean;
   stableAndPredictable: boolean;
   disclosureSignedDate?: string;

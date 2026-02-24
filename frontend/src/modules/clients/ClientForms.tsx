@@ -57,7 +57,7 @@ function CF01({ client }: { client: Client }) {
         <FormField label="Client Name" value={client.name} />
         <FormField label="Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
         <FormField label="Agency Name" />
-        <FormField label="License Classification" value={client.classification} type="select" options={['Limited', 'Basic', 'Intermediate', 'Comprehensive']} />
+        <FormField label="Agency License Classification" value="" type="select" options={['Limited', 'Basic', 'Intermediate', 'Comprehensive']} />
         <FormField label="Agency License Number" />
         <FormField label="Services Offered" type="select" options={['Personal Care', 'Personal Care + Medication Reminding', 'Personal Care + Medication Assistance', 'Personal Care + Medication Administration', 'Personal Care + Nursing Services']} />
       </div>
@@ -232,7 +232,7 @@ function CF04({ client }: { client: Client }) {
         <FormField label="Primary Care Provider" value={client.pcp} />
         <FormField label="PCP Phone" value={client.pcpPhone} />
         <FormField label="Plan Start Date" value={format(new Date(), 'yyyy-MM-dd')} type="date" />
-        <FormField label="Classification Level" value={client.classification} type="select" options={['Limited', 'Basic', 'Intermediate', 'Comprehensive']} />
+        <FormField label="Classification Level" value="" type="select" options={['Limited', 'Basic', 'Intermediate', 'Comprehensive']} />
       </div>
       <div className="form-section">
         <h3 className="text-sm font-semibold mb-2">Medical Conditions</h3>

@@ -100,7 +100,6 @@ export default function Clients() {
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Client</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Payer</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Classification</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Location</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Alerts</th>
               <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
@@ -119,9 +118,6 @@ export default function Clients() {
                   </td>
                   <td className="px-4 py-3"><span className={statusColor(client.status)}>{client.status}</span></td>
                   <td className="px-4 py-3 text-sm text-slate-600">{client.payer}</td>
-                  <td className="px-4 py-3">
-                    <span className="badge-blue">{client.classification}</span>
-                  </td>
                   <td className="px-4 py-3 text-sm text-slate-600">{client.location}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -178,7 +174,7 @@ function NewClientModal({ onClose, onSave }: { onClose: () => void; onSave: (c: 
     name: '', dob: '', address: '', phone: '', pcp: '', pcpPhone: '', hospital: '',
     payer: 'Medicaid' as Client['payer'], diagnoses: '', allergies: '', medications: '',
     fallRisk: 'Low' as Client['fallRisk'], emergencyContact: '', emergencyPhone: '',
-    location: 'Portland', classification: 'Basic' as Client['classification'], notes: ''
+    location: 'Portland', notes: ''
   });
 
   const handle = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -209,7 +205,7 @@ function NewClientModal({ onClose, onSave }: { onClose: () => void; onSave: (c: 
             <input className="form-input" type={k === 'dob' ? 'date' : 'text'} value={(form as any)[k]} onChange={e => handle(k, e.target.value)} />
           </div>
         ))}
-        {[['payer', 'Payer', ['Medicaid', 'Private Pay', 'Veterans', 'Long-Term Care Insurance']], ['location', 'Location', ['Portland', 'Eugene', 'Salem', 'Bend']], ['classification', 'Classification', ['Limited', 'Basic', 'Intermediate', 'Comprehensive']], ['fallRisk', 'Fall Risk', ['Low', 'Medium', 'High']]].map(([k, label, opts]) => (
+        {[['payer', 'Payer', ['Medicaid', 'Private Pay', 'Veterans', 'Long-Term Care Insurance']], ['location', 'Location', ['Portland', 'Eugene', 'Salem', 'Bend']], ['fallRisk', 'Fall Risk', ['Low', 'Medium', 'High']]].map(([k, label, opts]) => (
           <div key={k as string}>
             <label className="form-label">{label as string}</label>
             <select className="form-input" value={(form as any)[k as string]} onChange={e => handle(k as string, e.target.value)}>

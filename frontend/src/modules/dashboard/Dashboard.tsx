@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { Users, UserCheck, DollarSign, AlertTriangle, TrendingUp, Clock, CheckCircle, XCircle, Activity } from 'lucide-react';
-import { differenceInDays, parseISO, format } from 'date-fns';
+import { Users, UserCheck, AlertTriangle, TrendingUp, Clock, CheckCircle, XCircle, Activity } from 'lucide-react';
+import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 
 function KPICard({ label, value, sub, icon: Icon, color }: { label: string; value: string | number; sub?: string; icon: React.ElementType; color: string }) {
   return (
@@ -21,11 +21,33 @@ function KPICard({ label, value, sub, icon: Icon, color }: { label: string; valu
 export default function Dashboard() {
   const { clients, caregivers, shifts, locations } = useAppStore();
   const today = new Date();
+  const monthStart = startOfMonth(today);
+  const monthEnd = endOfMonth(today);
 
   const activeClients = clients.filter(c => c.status === 'Active').length;
   const activeCaregivers = caregivers.filter(c => c.status === 'Active').length;
 
-  // Compliance alerts
+  // Open shifts — scheduled with no caregiver assigned
+  const openShifts = shifts.filter(s =>
+    s.status === 'Scheduled' && (!s.caregiverId || s.caregiverId === '')
+  ).length;
+
+  // Visits completed this month
+  const visitsThisMonth = shifts.filter(s =>
+    s.status === 'Completed' &&
+    isWithinInterval(parseISO(s.date), { start: monthStart, end: monthEnd })
+  ).length;
+
+  // EVV compliance — verified / total completed this month
+  const completedThisMonth = shifts.filter(s =>
+    s.status === 'Completed' &&
+    isWithinInterval(parseISO(s.date), { start: monthStart, end: monthEnd })
+  );
+  const evvCompliance = completedThisMonth.length > 0
+    ? Math.round((completedThisMonth.filter(s => s.evvVerified).length / completedThisMonth.length) * 100)
+    : null;
+
+  // Compliance alerts derived from real client/caregiver/location data
   const complianceAlerts: { name: string; issue: string; severity: 'red' | 'yellow' }[] = [];
 
   clients.forEach(c => {
@@ -34,7 +56,7 @@ export default function Dashboard() {
     if (c.lastMonitoringDate) {
       const days = differenceInDays(today, parseISO(c.lastMonitoringDate));
       if (days > 90) complianceAlerts.push({ name: c.name, issue: `Monitoring visit overdue (${days}d ago)`, severity: 'red' });
-      else if (days > 75) complianceAlerts.push({ name: c.name, issue: `Monitoring visit due soon`, severity: 'yellow' });
+      else if (days > 75) complianceAlerts.push({ name: c.name, issue: 'Monitoring visit due soon', severity: 'yellow' });
     }
     if (c.canSelfDirect && c.lastSelfDirectionEvalDate) {
       const days = differenceInDays(today, parseISO(c.lastSelfDirectionEvalDate));
@@ -59,7 +81,6 @@ export default function Dashboard() {
     }
   });
 
-  // License expiry alerts
   locations.forEach(loc => {
     if (loc.licenseExpiry) {
       const days = differenceInDays(parseISO(loc.licenseExpiry), today);
@@ -67,17 +88,28 @@ export default function Dashboard() {
     }
   });
 
-  const openShifts = 7; // demo
-  const monthlyRevenue = '$142,850';
-  const evvCompliance = 94;
-
-  // Recent EVV activity (demo)
-  const evvFeed = [
-    { caregiver: 'Maria Santos', client: 'Margaret Thompson', action: 'Clock In', time: '8:02 AM', method: 'GPS', status: 'verified' },
-    { caregiver: 'James Wilson', client: 'Margaret Thompson', action: 'Clock Out', time: '12:15 PM', method: 'GPS', status: 'verified' },
-    { caregiver: 'Angela Davis', client: 'Dorothy Williams', action: 'Clock In', time: '9:30 AM', method: 'Telephony', status: 'verified' },
-    { caregiver: 'Robert Kim', client: 'Frank Morales', action: 'Clock In', time: '10:00 AM', method: 'GPS', status: 'pending' },
-  ];
+  // Recent EVV activity — last 4 shifts with clock events recorded
+  const evvFeed = shifts
+    .filter(s => s.evvClockIn || s.evvClockOut)
+    .sort((a, b) => {
+      const aTime = a.evvClockOut || a.evvClockIn || '';
+      const bTime = b.evvClockOut || b.evvClockIn || '';
+      return bTime.localeCompare(aTime);
+    })
+    .slice(0, 4)
+    .map(s => {
+      const caregiver = caregivers.find(c => c.id === s.caregiverId);
+      const client = clients.find(c => c.id === s.clientId);
+      const isClockIn = !!s.evvClockIn && !s.evvClockOut;
+      return {
+        caregiver: caregiver?.name ?? 'Unknown Caregiver',
+        client: client?.name ?? 'Unknown Client',
+        action: isClockIn ? 'Clock In' : 'Clock Out',
+        time: isClockIn ? (s.evvClockIn ?? '') : (s.evvClockOut ?? ''),
+        method: s.evvMethod ?? 'GPS',
+        status: s.evvVerified ? 'verified' : 'pending',
+      };
+    });
 
   return (
     <div className="space-y-6">
@@ -90,7 +122,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard label="Active Clients" value={activeClients} sub={`${clients.length} total`} icon={Users} color="bg-blue-600" />
         <KPICard label="Active Caregivers" value={activeCaregivers} sub={`${caregivers.length} total`} icon={UserCheck} color="bg-teal-600" />
-        <KPICard label="Monthly Revenue" value={monthlyRevenue} sub="Feb 2026" icon={DollarSign} color="bg-green-600" />
+        <KPICard label="Visits This Month" value={visitsThisMonth} sub={format(today, 'MMMM yyyy')} icon={TrendingUp} color="bg-green-600" />
         <KPICard label="Open Shifts" value={openShifts} sub="Need coverage" icon={Clock} color="bg-amber-500" />
       </div>
 
@@ -136,11 +168,15 @@ export default function Dashboard() {
             <h2 className="font-semibold text-slate-900">Locations</h2>
           </div>
           <div className="divide-y divide-slate-100">
-            {locations.filter(l => l.status !== 'Planning').map(loc => (
+            {locations.length === 0 ? (
+              <div className="px-5 py-6 text-sm text-slate-400 text-center">No locations configured</div>
+            ) : locations.map(loc => (
               <div key={loc.id} className="px-5 py-3">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium text-slate-700">{loc.name}</span>
-                  <span className="badge-blue">{loc.classification}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${loc.status === 'Active' ? 'bg-green-100 text-green-700' : loc.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {loc.status}
+                  </span>
                 </div>
                 <div className="flex gap-4 text-xs text-slate-500">
                   <span>{loc.activeClients} clients</span>
@@ -148,26 +184,22 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
-            <div className="px-5 py-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-400">Bend (Planned)</span>
-                <span className="badge-gray">Planning</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
       {/* EVV Feed & Stats Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Live EVV */}
+        {/* EVV Activity */}
         <div className="lg:col-span-2 card">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
             <Activity size={16} className="text-green-500 animate-pulse" />
-            <h2 className="font-semibold text-slate-900">Live EVV Feed</h2>
+            <h2 className="font-semibold text-slate-900">Recent EVV Activity</h2>
           </div>
           <div className="divide-y divide-slate-100">
-            {evvFeed.map((ev, i) => (
+            {evvFeed.length === 0 ? (
+              <div className="px-5 py-8 text-sm text-slate-400 text-center">No EVV activity recorded yet</div>
+            ) : evvFeed.map((ev, i) => (
               <div key={i} className="flex items-center gap-4 px-5 py-3">
                 <div className={`p-1.5 rounded-full ${ev.action === 'Clock In' ? 'bg-green-100' : 'bg-slate-100'}`}>
                   {ev.action === 'Clock In' ? <CheckCircle size={14} className="text-green-600" /> : <XCircle size={14} className="text-slate-500" />}
@@ -190,51 +222,39 @@ export default function Dashboard() {
           <div>
             <div className="flex justify-between text-sm mb-1">
               <span className="text-slate-500">EVV Compliance</span>
-              <span className="font-semibold text-slate-700">{evvCompliance}%</span>
+              <span className="font-semibold text-slate-700">
+                {evvCompliance !== null ? `${evvCompliance}%` : '—'}
+              </span>
             </div>
             <div className="h-2 bg-slate-100 rounded-full">
-              <div className="h-2 bg-green-500 rounded-full" style={{ width: `${evvCompliance}%` }} />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-500">Caregiver Utilization</span>
-              <span className="font-semibold text-slate-700">82%</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full">
-              <div className="h-2 bg-blue-500 rounded-full" style={{ width: '82%' }} />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-500">90-Day Retention</span>
-              <span className="font-semibold text-slate-700">78%</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full">
-              <div className="h-2 bg-teal-500 rounded-full" style={{ width: '78%' }} />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-500">Training Compliance</span>
-              <span className="font-semibold text-slate-700">91%</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full">
-              <div className="h-2 bg-purple-500 rounded-full" style={{ width: '91%' }} />
+              <div
+                className="h-2 bg-green-500 rounded-full transition-all"
+                style={{ width: evvCompliance !== null ? `${evvCompliance}%` : '0%' }}
+              />
             </div>
           </div>
           <div className="pt-2 border-t border-slate-100 space-y-1.5">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Avg Client Rating</span>
-              <span className="font-semibold">4.8 / 5.0</span>
+              <span className="text-slate-500">Active Clients</span>
+              <span className="font-semibold">{activeClients}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Active Caregivers</span>
+              <span className="font-semibold">{activeCaregivers}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Visits This Month</span>
-              <span className="font-semibold">1,284</span>
+              <span className="font-semibold">{visitsThisMonth}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-slate-500">Open Incidents</span>
-              <span className="font-semibold text-red-600">2</span>
+              <span className="text-slate-500">Open Shifts</span>
+              <span className="font-semibold">{openShifts}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Urgent Alerts</span>
+              <span className={`font-semibold ${complianceAlerts.filter(a => a.severity === 'red').length > 0 ? 'text-red-600' : 'text-slate-700'}`}>
+                {complianceAlerts.filter(a => a.severity === 'red').length}
+              </span>
             </div>
           </div>
         </div>
