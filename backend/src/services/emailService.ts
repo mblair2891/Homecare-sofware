@@ -1,9 +1,18 @@
+import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 
-const SMTP_CONFIGURED =
+// ─── Provider selection ────────────────────────────────────────────────────────
+// Priority: Resend (RESEND_API_KEY) → SMTP (SMTP_HOST + SMTP_USER + SMTP_PASS)
+//           → console-log fallback (dev/demo mode)
+
+const resend = process.env.RESEND_API_KEY
+  ? new Resend(process.env.RESEND_API_KEY)
+  : null;
+
+const smtpConfigured =
   process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
 
-const transporter = SMTP_CONFIGURED
+const smtpTransporter = smtpConfigured
   ? nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT) || 587,
@@ -12,31 +21,80 @@ const transporter = SMTP_CONFIGURED
     })
   : null;
 
-const FROM_ADDRESS = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@careaxis.io';
+// The FROM address must be a domain you have verified in Resend (or your SMTP
+// account). Set SMTP_FROM / RESEND_FROM to override, e.g. "CareAxis <noreply@yourdomain.com>"
+const FROM_ADDRESS =
+  process.env.RESEND_FROM ||
+  process.env.SMTP_FROM ||
+  process.env.SMTP_USER ||
+  'CareAxis <onboarding@resend.dev>';
 
-interface EmailOptions { to: string; subject: string; html: string; text?: string; }
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; message: string }> {
-  if (!transporter) {
-    console.log('──────────────────────────────────────────────────');
-    console.log('EMAIL (SMTP not configured — logged to console)');
-    console.log(`  To:      ${options.to}`);
-    console.log(`  Subject: ${options.subject}`);
-    console.log(`  Body:    ${options.text || '(HTML only)'}`);
-    console.log('──────────────────────────────────────────────────');
-    return { success: true, message: 'Email logged to console (SMTP not configured)' };
-  }
-  try {
-    await transporter.sendMail({ from: FROM_ADDRESS, ...options });
-    return { success: true, message: `Email sent to ${options.to}` };
-  } catch (err: any) {
-    console.error('Email send failed:', err.message);
-    return { success: false, message: err.message };
-  }
+interface EmailOptions {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
 }
 
+// ─── Core send function ────────────────────────────────────────────────────────
+
+export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; message: string }> {
+  // 1. Resend
+  if (resend) {
+    try {
+      const { error } = await resend.emails.send({
+        from: FROM_ADDRESS,
+        to: [options.to],
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      });
+      if (error) {
+        console.error('Resend send error:', error);
+        return { success: false, message: error.message };
+      }
+      console.log(`Email sent via Resend → ${options.to}: ${options.subject}`);
+      return { success: true, message: `Email sent to ${options.to}` };
+    } catch (err: any) {
+      console.error('Resend exception:', err.message);
+      return { success: false, message: err.message };
+    }
+  }
+
+  // 2. SMTP / Nodemailer
+  if (smtpTransporter) {
+    try {
+      await smtpTransporter.sendMail({ from: FROM_ADDRESS, ...options });
+      console.log(`Email sent via SMTP → ${options.to}: ${options.subject}`);
+      return { success: true, message: `Email sent to ${options.to}` };
+    } catch (err: any) {
+      console.error('SMTP send error:', err.message);
+      return { success: false, message: err.message };
+    }
+  }
+
+  // 3. No provider configured — log to console (dev / demo mode)
+  console.log('────────────────────────────────────────────────────');
+  console.log('EMAIL (no provider configured — logged to console)');
+  console.log(`  To:      ${options.to}`);
+  console.log(`  Subject: ${options.subject}`);
+  if (options.text) console.log(`  Body:\n${options.text}`);
+  console.log('────────────────────────────────────────────────────');
+  console.log('Set RESEND_API_KEY to send real emails.');
+  return { success: true, message: 'Email logged to console (no provider configured)' };
+}
+
+// ─── Email templates ──────────────────────────────────────────────────────────
+
 export function buildWelcomeEmail(p: {
-  recipientName: string; email: string; tempPassword: string; role: string; agencyName: string; loginUrl?: string;
+  recipientName: string;
+  email: string;
+  tempPassword: string;
+  role: string;
+  agencyName: string;
+  loginUrl?: string;
 }): EmailOptions {
   const url = p.loginUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
   return {
@@ -58,15 +116,21 @@ export function buildWelcomeEmail(p: {
         </table>
       </div>
       <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:16px;margin:24px 0">
-        <p style="margin:0;color:#92400e;font-size:14px;font-weight:600">Important: Please change your password after your first login.</p>
+        <p style="margin:0;color:#92400e;font-size:14px;font-weight:600">⚠ Please change your password after your first login.</p>
       </div>
+      <p style="color:#64748b;font-size:12px;text-align:center;margin-top:32px">CareAxis — Homecare Management Platform</p>
     </div>`,
     text: `Welcome to CareAxis — ${p.agencyName}\n\nHi ${p.recipientName},\n\nYour account:\n  URL: ${url}\n  Email: ${p.email}\n  Password: ${p.tempPassword}\n  Role: ${p.role}\n\nPlease change your password after first login.`,
   };
 }
 
 export function buildAgencyWelcomeEmail(p: {
-  adminName: string; email: string; tempPassword: string; agencyName: string; companyName: string; loginUrl?: string;
+  adminName: string;
+  email: string;
+  tempPassword: string;
+  agencyName: string;
+  companyName: string;
+  loginUrl?: string;
 }): EmailOptions {
   const url = p.loginUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
   return {
@@ -92,13 +156,14 @@ export function buildAgencyWelcomeEmail(p: {
         <ol style="margin:0;padding-left:20px;color:#166534;font-size:13px;line-height:1.8">
           <li>Log in and change your password</li>
           <li>Complete your agency profile in Settings</li>
-          <li>Add staff users under Settings &rarr; Users &amp; Roles</li>
+          <li>Add staff users under Settings → Users &amp; Roles</li>
           <li>Begin adding clients and caregivers</li>
         </ol>
       </div>
       <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:16px;margin:24px 0">
-        <p style="margin:0;color:#92400e;font-size:14px;font-weight:600">Important: Please change your password after your first login.</p>
+        <p style="margin:0;color:#92400e;font-size:14px;font-weight:600">⚠ Please change your password after your first login.</p>
       </div>
+      <p style="color:#64748b;font-size:12px;text-align:center;margin-top:32px">CareAxis — Homecare Management Platform</p>
     </div>`,
     text: `Welcome to CareAxis\n\nHi ${p.adminName},\n\n${p.companyName} — ${p.agencyName} is live.\n\n  URL: ${url}\n  Email: ${p.email}\n  Password: ${p.tempPassword}\n  Role: Administrator (Owner)\n\nPlease change your password after first login.`,
   };
