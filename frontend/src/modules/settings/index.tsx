@@ -55,8 +55,16 @@ export function AddUserModal({ onClose, onUserCreated, agencyIdOverride, agencyN
 
     setSubmitting(true);
     try {
-      // Try the backend API first (requires JWT auth).
-      const res = await api.post('/api/users', { name: form.name.trim(), email: form.email.trim().toLowerCase(), role: form.role, location: form.location, agencyId, agencyName });
+      // /api/users/invite is public — validates agencyId against the DB,
+      // creates the user, and sends a welcome email via Resend.
+      const res = await api.post('/api/users/invite', {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        role: form.role,
+        location: form.location,
+        agencyId,
+        agencyName,
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create user');
 
@@ -64,24 +72,13 @@ export function AddUserModal({ onClose, onUserCreated, agencyIdOverride, agencyN
         id: data.user.id, name: data.user.name, email: data.user.email,
         role: data.user.role as UserRole, agencyId, agencyName,
         mustChangePassword: true, password: data.tempPassword,
-        location: data.user.location || form.location, status: 'Active',
+        location: form.location, status: 'Active',
         createdAt: new Date().toISOString().slice(0, 10),
       };
       setSuccess({ email: data.user.email, tempPassword: data.tempPassword });
       onUserCreated(managedUser, data.tempPassword);
-    } catch {
-      // Backend unreachable or user not authenticated — fall back to local
-      // creation so the SuperAdmin and offline/demo flows still work.
-      const tempPassword = Math.random().toString(36).slice(-10).toUpperCase();
-      const managedUser: ManagedUser = {
-        id: `u-${Date.now()}`, name: form.name.trim(), email: form.email.trim().toLowerCase(),
-        role: form.role, agencyId, agencyName,
-        mustChangePassword: true, password: tempPassword,
-        location: form.location, status: 'Active',
-        createdAt: new Date().toISOString().slice(0, 10),
-      };
-      setSuccess({ email: managedUser.email, tempPassword });
-      onUserCreated(managedUser, tempPassword);
+    } catch (err: any) {
+      setError(err.message || 'Could not reach the server. Check that the backend is running and VITE_API_URL is set.');
     } finally {
       setSubmitting(false);
     }

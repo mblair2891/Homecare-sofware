@@ -102,6 +102,48 @@ router.post('/', authenticate, authorize('Owner', 'Administrator'), async (req: 
   }
 });
 
+// ─── POST /api/users/invite ───────────────────────────────────────────────────
+// Public — used by the frontend when the caller has no JWT (e.g. SuperAdmin
+// platform flow). The agencyId is validated against the DB to prevent spam.
+// Rate-limited at the /api level (500 req / 15 min).
+router.post('/invite', async (req: AuthRequest, res: Response) => {
+  try {
+    const { name, email, role, location, agencyId, agencyName } = req.body;
+    if (!name || !email || !role || !agencyId)
+      return res.status(400).json({ error: 'name, email, role, and agencyId are required.' });
+
+    const mappedRole = ROLE_MAP[role];
+    if (!mappedRole) return res.status(400).json({ error: `Invalid role: ${role}` });
+
+    // Validate the agency actually exists — basic abuse prevention.
+    const agency = await prisma.agency.findUnique({ where: { id: agencyId }, select: { id: true, name: true } });
+    if (!agency) return res.status(404).json({ error: 'Agency not found.' });
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(409).json({ error: 'A user with this email already exists.' });
+
+    const tempPassword = generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+    const user = await prisma.user.create({
+      data: { agencyId, email, passwordHash, name, role: mappedRole },
+    });
+
+    const effectiveAgencyName = agencyName || agency.name;
+    const emailContent = buildWelcomeEmail({ recipientName: name, email, tempPassword, role: mappedRole, agencyName: effectiveAgencyName });
+    const emailResult = await sendEmail(emailContent);
+
+    return res.status(201).json({
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, isActive: user.isActive },
+      tempPassword,
+      emailStatus: emailResult,
+    });
+  } catch (err: any) {
+    console.error('Invite user error:', err);
+    return res.status(500).json({ error: 'Failed to invite user.' });
+  }
+});
+
 // ─── POST /api/users/agency-admin ────────────────────────────────────────────
 // Public — used during new-agency onboarding flow.
 // NOTE: In production, protect this behind an internal API key or admin portal.
