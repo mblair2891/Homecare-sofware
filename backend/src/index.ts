@@ -34,7 +34,7 @@ const aiLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, message: 'AI rate li
 app.use('/api', limiter);
 app.use('/api/policies', aiLimiter);
 
-// Routes
+// Routes — auth middleware is applied at the route level via authenticate()
 app.use('/api/auth', authRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/caregivers', caregiversRouter);
