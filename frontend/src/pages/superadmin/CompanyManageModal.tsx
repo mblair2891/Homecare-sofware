@@ -39,7 +39,14 @@ function InlineAddUser({ company, onUserCreated, onCancel }: {
 
     setSubmitting(true);
     try {
-      const res = await api.post('/api/users', { name: form.name.trim(), email: form.email.trim().toLowerCase(), role: form.role, location: 'All', agencyId, agencyName });
+      const res = await api.post('/api/users/invite', {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        role: form.role,
+        location: 'All',
+        agencyId,
+        agencyName,
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create user');
 
@@ -51,17 +58,8 @@ function InlineAddUser({ company, onUserCreated, onCancel }: {
       };
       setSuccess({ email: data.user.email, tempPassword: data.tempPassword });
       onUserCreated(managedUser, data.tempPassword);
-    } catch {
-      // Backend unreachable or user not authenticated — fall back to local creation.
-      const tempPassword = Math.random().toString(36).slice(-10).toUpperCase();
-      const managedUser: ManagedUser = {
-        id: `u-${Date.now()}`, name: form.name.trim(), email: form.email.trim().toLowerCase(),
-        role: form.role, agencyId, agencyName,
-        mustChangePassword: true, password: tempPassword,
-        location: 'All', status: 'Active', createdAt: new Date().toISOString().slice(0, 10),
-      };
-      setSuccess({ email: managedUser.email, tempPassword });
-      onUserCreated(managedUser, tempPassword);
+    } catch (err: any) {
+      setError(err.message || 'Could not reach the server. Check that VITE_API_URL is set.');
     } finally {
       setSubmitting(false);
     }
