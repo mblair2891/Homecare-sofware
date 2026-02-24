@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Save, CheckCircle, X, UserPlus, Mail, Loader, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Save, CheckCircle, X, UserPlus, Mail, Loader, AlertTriangle, Trash2, RefreshCw } from 'lucide-react';
 import { useAuthStore, type UserRole, type ManagedUser } from '../../store/useAuthStore';
 import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../lib/api';
@@ -29,8 +29,24 @@ const ROLES: { value: UserRole; label: string; description: string }[] = [
   { value: 'ReadOnly', label: 'Read Only', description: 'View-only access across modules' },
 ];
 
+const OWNER_ROLES: { value: UserRole; label: string; description: string }[] = [
+  { value: 'Owner', label: 'Owner', description: 'Full agency ownership and billing access' },
+  ...ROLES,
+];
+
+// ─── API User shape returned by GET /api/users ─────────────────────────────
+
+interface ApiUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  locationId: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
 // ─── Shared Add User Modal ──────────────────────────────────────────────────
-// Exported so the SuperAdmin CompanyManageModal can reuse it.
 
 export function AddUserModal({ onClose, onUserCreated, agencyIdOverride, agencyNameOverride }: {
   onClose: () => void;
@@ -38,8 +54,11 @@ export function AddUserModal({ onClose, onUserCreated, agencyIdOverride, agencyN
   agencyIdOverride?: string;
   agencyNameOverride?: string;
 }) {
-  const { user: currentUser, impersonatingAgency } = useAuthStore();
+  const { user: currentUser, impersonatingAgency, token } = useAuthStore();
   const { locations } = useAppStore();
+  const isOwner = currentUser?.role === 'Owner' || currentUser?.role === 'SuperAdmin';
+  const availableRoles = isOwner ? OWNER_ROLES : ROLES;
+
   const [form, setForm] = useState({ name: '', email: '', role: 'Coordinator' as UserRole, location: 'All' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -55,16 +74,14 @@ export function AddUserModal({ onClose, onUserCreated, agencyIdOverride, agencyN
 
     setSubmitting(true);
     try {
-      // /api/users/invite is public — validates agencyId against the DB,
-      // creates the user, and sends a welcome email via Resend.
-      const res = await api.post('/api/users/invite', {
-        name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
-        role: form.role,
-        location: form.location,
-        agencyId,
-        agencyName,
-      });
+      // Use authenticated endpoint when a JWT is present (agency Owner/Admin creating users)
+      // Fall back to public /invite for SuperAdmin impersonation flow (no token)
+      const endpoint = token ? '/api/users' : '/api/users/invite';
+      const body = token
+        ? { name: form.name.trim(), email: form.email.trim().toLowerCase(), role: form.role, locationId: null, agencyName }
+        : { name: form.name.trim(), email: form.email.trim().toLowerCase(), role: form.role, location: form.location, agencyId, agencyName };
+
+      const res = await api.post(endpoint, body);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create user');
 
@@ -129,8 +146,10 @@ export function AddUserModal({ onClose, onUserCreated, agencyIdOverride, agencyN
                 </div>
                 <div>
                   <label className="form-label">Role *</label>
-                  <select className="form-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>{ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select>
-                  <p className="text-xs text-slate-400 mt-1">{ROLES.find((r) => r.value === form.role)?.description}</p>
+                  <select className="form-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}>
+                    {availableRoles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">{availableRoles.find((r) => r.value === form.role)?.description}</p>
                 </div>
                 <div>
                   <label className="form-label">Location Access</label>
@@ -155,6 +174,49 @@ export function AddUserModal({ onClose, onUserCreated, agencyIdOverride, agencyN
   );
 }
 
+// ─── Confirm Delete Dialog ──────────────────────────────────────────────────
+
+function ConfirmDeleteModal({ user, onConfirm, onCancel, loading }: {
+  user: ApiUser;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center"><Trash2 size={18} className="text-red-600" /></div>
+            <h2 className="text-lg font-semibold text-slate-800">Deactivate User</h2>
+          </div>
+          <button onClick={onCancel} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <p className="text-sm text-slate-600">
+            Are you sure you want to deactivate <span className="font-semibold text-slate-800">{user.name}</span> ({user.email})?
+            They will lose access immediately.
+          </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+            <AlertTriangle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700">This account can be reactivated by an Owner at any time by editing the user.</p>
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <button onClick={onCancel} className="flex-1 btn-secondary py-2">Cancel</button>
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? <><Loader size={14} className="animate-spin" /> Deactivating...</> : <><Trash2 size={14} /> Deactivate</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Settings Module ───────────────────────────────────────────────────
 
 export default function SettingsModule() {
@@ -163,14 +225,94 @@ export default function SettingsModule() {
   const [showAddUser, setShowAddUser] = useState(false);
   const { managedUsers, addManagedUser, user: currentUser, impersonatingAgency } = useAuthStore();
 
+  // Real users fetched from the API
+  const [apiUsers, setApiUsers] = useState<ApiUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState('');
+
+  // Per-row action state
+  const [deleteTarget, setDeleteTarget] = useState<ApiUser | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState<string | null>(null);
+  const [resendResult, setResendResult] = useState<{ userId: string; ok: boolean; msg: string } | null>(null);
+
   const save = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
 
+  const isAgencyAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'Administrator';
+
   const agencyId = impersonatingAgency?.id || currentUser?.agencyId;
-  const agencyUsers = managedUsers.filter((u) => {
+
+  // Fetch users from the real API (Owner / Administrator only)
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    setUsersError('');
+    try {
+      const res = await api.get('/api/users');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load users');
+      setApiUsers(data.users as ApiUser[]);
+    } catch (err: any) {
+      setUsersError(err.message || 'Could not load users');
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'users' && isAgencyAdmin) {
+      fetchUsers();
+    }
+  }, [tab, isAgencyAdmin, fetchUsers]);
+
+  // ── Delete (deactivate) ──────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    try {
+      const res = await api.del(`/api/users/${deleteTarget.id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to deactivate user');
+      // Remove from local list immediately
+      setApiUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err: any) {
+      alert(err.message || 'Failed to deactivate user');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // ── Resend welcome email ─────────────────────────────────────────────────
+  const handleResendWelcome = async (user: ApiUser) => {
+    setResendLoading(user.id);
+    setResendResult(null);
+    try {
+      const res = await api.post(`/api/users/${user.id}/resend-welcome`, {});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to resend email');
+      setResendResult({ userId: user.id, ok: true, msg: `Welcome email resent to ${user.email}` });
+    } catch (err: any) {
+      setResendResult({ userId: user.id, ok: false, msg: err.message || 'Failed to resend email' });
+    } finally {
+      setResendLoading(null);
+      setTimeout(() => setResendResult(null), 4000);
+    }
+  };
+
+  // ── Fallback: local managed users (SuperAdmin / no-backend mode) ─────────
+  const localAgencyUsers = managedUsers.filter((u) => {
     if (u.role === 'SuperAdmin') return false;
     if (!agencyId) return true;
     return u.agencyId === agencyId;
   });
+
+  const canDelete = (target: ApiUser) => {
+    if (currentUser?.role === 'Owner') return target.id !== currentUser.id;
+    if (currentUser?.role === 'Administrator') {
+      return target.role !== 'Owner' && target.role !== 'Administrator';
+    }
+    return false;
+  };
 
   return (
     <div className="space-y-6">
@@ -244,32 +386,110 @@ export default function SettingsModule() {
       )}
 
       {tab === 'users' && (
-        <div className="card overflow-hidden max-w-3xl">
+        <div className="card overflow-hidden max-w-4xl">
           <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
             <h2 className="font-semibold text-slate-800">Users & Role-Based Access</h2>
-            <button onClick={() => setShowAddUser(true)} className="btn-primary text-sm flex items-center gap-2"><UserPlus size={14} /> Add User</button>
+            <div className="flex items-center gap-2">
+              {isAgencyAdmin && (
+                <button onClick={fetchUsers} title="Refresh" className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+                  <RefreshCw size={14} className={usersLoading ? 'animate-spin' : ''} />
+                </button>
+              )}
+              {isAgencyAdmin && (
+                <button onClick={() => setShowAddUser(true)} className="btn-primary text-sm flex items-center gap-2"><UserPlus size={14} /> Add User</button>
+              )}
+            </div>
           </div>
+
+          {resendResult && (
+            <div className={`mx-4 mt-3 px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${resendResult.ok ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+              {resendResult.ok ? <CheckCircle size={14} /> : <AlertTriangle size={14} />}
+              {resendResult.msg}
+            </div>
+          )}
+
+          {usersError && (
+            <div className="mx-4 mt-3 px-4 py-2 rounded-lg text-sm flex items-center gap-2 bg-red-50 border border-red-200 text-red-700">
+              <AlertTriangle size={14} /> {usersError}
+            </div>
+          )}
+
           <table className="w-full">
-            <thead><tr className="bg-slate-50 border-b border-slate-200">{['User', 'Role', 'Location Access', 'Status', 'Actions'].map(h => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>)}</tr></thead>
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                {['User', 'Role', 'Status', isAgencyAdmin ? 'Actions' : ''].filter(Boolean).map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>
+                ))}
+              </tr>
+            </thead>
             <tbody className="divide-y divide-slate-100">
-              {agencyUsers.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+              {usersLoading ? (
+                <tr><td colSpan={isAgencyAdmin ? 4 : 3} className="px-4 py-10 text-center text-slate-400">
+                  <Loader size={20} className="mx-auto animate-spin mb-2 opacity-40" />
+                  <p className="text-sm">Loading users...</p>
+                </td></tr>
+              ) : apiUsers.length > 0 ? (
+                apiUsers.map(user => (
+                  <tr key={user.id} className={`hover:bg-slate-50 ${!user.isActive ? 'opacity-50' : ''}`}>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium text-slate-800">{user.name}</div>
+                      <div className="text-xs text-slate-400">{user.email}</div>
+                    </td>
+                    <td className="px-4 py-3"><span className="badge-blue">{user.role}</span></td>
+                    <td className="px-4 py-3">
+                      <span className={user.isActive ? 'badge-green' : 'badge-gray'}>{user.isActive ? 'Active' : 'Inactive'}</span>
+                    </td>
+                    {isAgencyAdmin && (
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleResendWelcome(user)}
+                            disabled={resendLoading === user.id || !user.isActive}
+                            title="Resend welcome email with new temp password"
+                            className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+                          >
+                            {resendLoading === user.id
+                              ? <Loader size={12} className="animate-spin" />
+                              : <Mail size={12} />}
+                            Resend Email
+                          </button>
+                          {canDelete(user) && (
+                            <button
+                              onClick={() => setDeleteTarget(user)}
+                              title="Deactivate user"
+                              className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-medium"
+                            >
+                              <Trash2 size={12} /> Deactivate
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              ) : localAgencyUsers.length > 0 ? (
+                // Fallback: show locally managed users when API returns nothing
+                localAgencyUsers.map(user => (
+                  <tr key={user.email} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium">{user.name}</div>
+                      <div className="text-xs text-slate-400">{user.email}</div>
+                    </td>
+                    <td className="px-4 py-3"><span className="badge-blue">{user.role}</span></td>
+                    <td className="px-4 py-3">
+                      <span className={user.status === 'Active' ? 'badge-green' : 'badge-gray'}>{user.status}</span>
+                      {user.mustChangePassword && <span className="ml-2 text-xs text-amber-600 font-medium">Pending first login</span>}
+                    </td>
+                    {isAgencyAdmin && <td className="px-4 py-3"></td>}
+                  </tr>
+                ))
+              ) : (
+                <tr><td colSpan={isAgencyAdmin ? 4 : 3} className="px-4 py-10 text-center text-slate-400">
                   <UserPlus size={28} className="mx-auto mb-3 opacity-40" />
                   <p className="text-sm font-medium">No users added yet</p>
                   <p className="text-xs mt-1">Add users to manage access and roles. Each user receives a welcome email with login credentials.</p>
                 </td></tr>
-              ) : agencyUsers.map(user => (
-                <tr key={user.email} className="hover:bg-slate-50">
-                  <td className="px-4 py-3"><div className="text-sm font-medium">{user.name}</div><div className="text-xs text-slate-400">{user.email}</div></td>
-                  <td className="px-4 py-3"><span className="badge-blue">{user.role}</span></td>
-                  <td className="px-4 py-3 text-sm text-slate-500">{user.location}</td>
-                  <td className="px-4 py-3">
-                    <span className={user.status === 'Active' ? 'badge-green' : 'badge-gray'}>{user.status}</span>
-                    {user.mustChangePassword && <span className="ml-2 text-xs text-amber-600 font-medium">Pending first login</span>}
-                  </td>
-                  <td className="px-4 py-3"><button className="text-sm text-blue-600 hover:text-blue-800">Edit</button></td>
-                </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -301,7 +521,21 @@ export default function SettingsModule() {
         </div>
       )}
 
-      {showAddUser && <AddUserModal onClose={() => setShowAddUser(false)} onUserCreated={(user) => addManagedUser(user)} />}
+      {showAddUser && (
+        <AddUserModal
+          onClose={() => setShowAddUser(false)}
+          onUserCreated={(user) => { addManagedUser(user); fetchUsers(); }}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          user={deleteTarget}
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          loading={deleteLoading}
+        />
+      )}
     </div>
   );
 }

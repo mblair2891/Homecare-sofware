@@ -224,15 +224,58 @@ router.patch('/:id', authenticate, authorize('Owner', 'Administrator'), async (r
   }
 });
 
+// ─── POST /api/users/:id/resend-welcome ──────────────────────────────────────
+// Owner and Administrator — generate a new temp password and re-send the welcome email
+router.post('/:id/resend-welcome', authenticate, authorize('Owner', 'Administrator'), async (req: AuthRequest, res: Response) => {
+  try {
+    const existing = await prisma.user.findFirst({
+      where: { id: req.params.id, agencyId: req.user!.agencyId },
+      include: { agency: { select: { name: true } } },
+    });
+    if (!existing) return res.status(404).json({ error: 'User not found' });
+    if (!existing.isActive) return res.status(400).json({ error: 'Cannot resend email to a deactivated user.' });
+
+    // Administrator cannot resend to an Owner
+    if (existing.role === 'Owner' && req.user!.role !== 'Owner') {
+      return res.status(403).json({ error: 'Only an Owner can manage another Owner account.' });
+    }
+
+    const tempPassword = generateTempPassword();
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    await prisma.user.update({ where: { id: req.params.id }, data: { passwordHash } });
+
+    const agencyName = existing.agency?.name || 'CareAxis';
+    const emailContent = buildWelcomeEmail({
+      recipientName: existing.name,
+      email: existing.email,
+      tempPassword,
+      role: existing.role,
+      agencyName,
+    });
+    const emailResult = await sendEmail(emailContent);
+
+    return res.json({ message: 'Welcome email resent', emailStatus: emailResult, tempPassword });
+  } catch (err) {
+    console.error('Resend welcome error:', err);
+    return res.status(500).json({ error: 'Failed to resend welcome email' });
+  }
+});
+
 // ─── DELETE /api/users/:id ────────────────────────────────────────────────────
-// Owner only — hard deactivation (soft-delete by setting isActive=false)
-router.delete('/:id', authenticate, authorize('Owner'), async (req: AuthRequest, res: Response) => {
+// Owner or Administrator — soft-delete by setting isActive=false.
+// Administrator cannot deactivate an Owner or another Administrator.
+router.delete('/:id', authenticate, authorize('Owner', 'Administrator'), async (req: AuthRequest, res: Response) => {
   try {
     if (req.params.id === req.user!.userId) {
       return res.status(400).json({ error: 'You cannot deactivate your own account.' });
     }
     const existing = await prisma.user.findFirst({ where: { id: req.params.id, agencyId: req.user!.agencyId } });
     if (!existing) return res.status(404).json({ error: 'User not found' });
+
+    // Administrators may not deactivate Owners or other Administrators
+    if (req.user!.role === 'Administrator' && (existing.role === 'Owner' || existing.role === 'Administrator')) {
+      return res.status(403).json({ error: 'Administrators can only deactivate Coordinator, Nurse, Biller, or ReadOnly users.' });
+    }
 
     const user = await prisma.user.update({ where: { id: req.params.id }, data: { isActive: false } });
     res.json({ message: 'User deactivated', userId: user.id });
